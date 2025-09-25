@@ -38,7 +38,7 @@ layout: default
           <p>Projects Completed</p>
         </div>
         <div class="stat">
-          <h3>∞</h3>
+          <h3>1M+</h3>
           <p>Lines of Code</p>
         </div>
       </div>
@@ -55,22 +55,22 @@ layout: default
     </div>
     <div class="skills-grid">
       <div class="skill-card">
-        <div class="skill-icon">🌐</div>
+        <div class="skill-icon">&lt;/&gt;</div>
         <h3>Frontend</h3>
         <p>React, Vue.js, HTML, CSS, JavaScript</p>
       </div>
       <div class="skill-card">
-        <div class="skill-icon">⚙️</div>
+        <div class="skill-icon">{ }</div>
         <h3>Backend</h3>
         <p>Node.js, Python, API Development</p>
       </div>
       <div class="skill-card">
-        <div class="skill-icon">🗄️</div>
+        <div class="skill-icon">DB</div>
         <h3>Database</h3>
         <p>MongoDB, PostgreSQL, MySQL</p>
       </div>
       <div class="skill-card">
-        <div class="skill-icon">🔧</div>
+        <div class="skill-icon">CLI</div>
         <h3>Tools</h3>
         <p>Git, Docker, AWS, VS Code</p>
       </div>
@@ -112,7 +112,7 @@ layout: default
       <p class="contact-text">Feel free to reach out if you'd like to collaborate or just say hello!</p>
       <div class="contact-links">
         <a href="https://github.com/oujingwen" target="_blank" class="contact-link">
-          <span class="link-icon">📧</span>
+          <span class="link-icon">@</span>
           <span>GitHub</span>
         </a>
       </div>
@@ -377,12 +377,14 @@ layout: default
   }
 
   .project-image::after {
-    content: '🚀';
+    content: 'CODE';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 3rem;
+    font-size: 2rem;
+    font-weight: bold;
+    color: white;
   }
 
   .project-content {
