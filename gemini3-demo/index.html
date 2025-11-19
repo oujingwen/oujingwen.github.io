@@ -1,0 +1,708 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Super Mario 1-1 (Physics Tuned)</title>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background-color: #202020;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background: #000;
+        }
+        canvas {
+            background-color: #5c94fc;
+            display: block;
+            image-rendering: pixelated;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 10px; left: 10px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            font-size: 18px;
+            z-index: 10;
+        }
+        #sound-toggle {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.5); color: white;
+            padding: 5px 10px; border-radius: 5px; font-size: 12px;
+            cursor: pointer; z-index: 15;
+        }
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 20;
+            cursor: pointer;
+        }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+        .controls {
+            display: none;
+            width: 100%; max-width: 800px; height: 120px;
+            margin-top: 10px; justify-content: space-between;
+            padding: 0 20px; box-sizing: border-box;
+        }
+        .btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%; width: 65px; height: 65px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: white;
+        }
+        .btn:active { background: rgba(255, 255, 255, 0.4); }
+        .d-pad { display: flex; gap: 15px; }
+        .action-pad { display: flex; gap: 15px; }
+        @media (max-width: 800px) {
+            canvas { width: 100%; height: auto; }
+            .controls { display: flex; }
+        }
+        .char-btn {
+            background: rgba(255,255,255,0.1); color: #aaa;
+            border: 1px solid #555;
+            padding: 8px 15px; margin: 0 5px; cursor: pointer;
+            font-family: inherit; font-size: 14px; border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .char-btn:hover { background: rgba(255,255,255,0.2); color: white; }
+        .char-btn.selected {
+            background: #d32f2f; color: white; border-color: #ff5252;
+            box-shadow: 0 0 10px rgba(211, 47, 47, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui-layer">WORLD 1-1 <br><small>SCORE: <span id="score">0</span></small></div>
+        <div id="sound-toggle">🔊 聲音: 開</div>
+
+        <div id="start-screen">
+            <h1 style="font-size:40px; margin-bottom:10px; text-shadow: 4px 4px #d32f2f;">SUPER MARIO JS</h1>
+
+            <div style="margin: 20px 0; text-align: center; z-index: 30;">
+                <div style="margin-bottom: 10px; font-size: 14px; color: #ccc;">選擇角色</div>
+                <button class="char-btn selected" onclick="selectChar('mario', this)">瑪利歐</button>
+                <button class="char-btn" onclick="selectChar('thomas', this)">湯瑪士</button>
+                <button class="char-btn" onclick="selectChar('po', this)">天線寶寶</button>
+            </div>
+
+            <p class="blink">點擊畫面或按任意鍵開始</p>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="450"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="d-pad">
+            <div class="btn" id="btn-left">←</div>
+            <div class="btn" id="btn-right">→</div>
+        </div>
+        <div class="action-pad">
+            <div class="btn" id="btn-jump" style="background:rgba(200,0,0,0.3)">A</div>
+            <div class="btn" id="btn-reset" style="font-size:16px">R</div>
+        </div>
+    </div>
+
+<script>
+// --- Audio Engine (不變) ---
+const AudioEngine = {
+    ctx: null, isPlaying: false, muted: false,
+    init() { window.AudioContext = window.AudioContext || window.webkitAudioContext; this.ctx = new AudioContext(); },
+    resume() { if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+    toggleMute() {
+        this.muted = !this.muted;
+        if(this.muted && this.ctx) this.ctx.suspend();
+        else if(this.ctx) this.ctx.resume();
+        return this.muted;
+    },
+    playTone(freq, type, dur, vol=0.1) {
+        if(!this.ctx || this.muted) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + dur);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + dur);
+    },
+    playJump() {
+        if(!this.ctx || this.muted) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+    },
+    playStomp() { this.playTone(100, 'sawtooth', 0.1); },
+    playCoin() {
+        if(!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        const t = (f, s, d) => {
+            const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+            o.type='square'; o.frequency.value=f;
+            g.gain.setValueAtTime(0.1, s); g.gain.linearRampToValueAtTime(0, s+d);
+            o.connect(g); g.connect(this.ctx.destination); o.start(s); o.stop(s+d);
+        };
+        t(988, now, 0.1); t(1319, now+0.1, 0.3);
+    },
+    playDie() {
+        if(!this.ctx || this.muted) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type='triangle'; osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(50, this.ctx.currentTime + 0.6);
+        gain.gain.value=0.2; osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime+0.6);
+    },
+    melody: [
+        {n:659,d:0.15},{n:null,d:0.15},{n:659,d:0.15},{n:null,d:0.15},{n:659,d:0.15},{n:null,d:0.15},{n:523,d:0.15},{n:659,d:0.15},
+        {n:784,d:0.3},{n:null,d:0.3},{n:392,d:0.3},{n:null,d:0.3},
+        {n:523,d:0.3},{n:392,d:0.2},{n:330,d:0.3},{n:440,d:0.2},{n:494,d:0.2},{n:466,d:0.1},{n:440,d:0.2},
+        {n:392,d:0.15},{n:659,d:0.2},{n:784,d:0.2},{n:880,d:0.2},{n:698,d:0.1},{n:784,d:0.1},
+        {n:659,d:0.2},{n:523,d:0.15},{n:587,d:0.15},{n:494,d:0.2}
+    ],
+    noteIdx: 0, nextTime: 0,
+    startMusic() {
+        if(!this.ctx || this.muted || this.isPlaying) return;
+        this.isPlaying = true; this.noteIdx = 0; this.nextTime = this.ctx.currentTime + 0.1;
+        this.scheduler();
+    },
+    scheduler() {
+        if(!this.isPlaying) return;
+        while(this.nextTime < this.ctx.currentTime + 0.1) {
+            const note = this.melody[this.noteIdx];
+            if(note.n) {
+                const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+                o.type='square'; o.frequency.value=note.n;
+                g.gain.setValueAtTime(0.05, this.nextTime); g.gain.linearRampToValueAtTime(0, this.nextTime+note.d-0.05);
+                o.connect(g); g.connect(this.ctx.destination); o.start(this.nextTime); o.stop(this.nextTime+note.d);
+            }
+            this.nextTime += note.d;
+            this.noteIdx = (this.noteIdx + 1) % this.melody.length;
+            if(this.noteIdx===0) this.noteIdx=12;
+        }
+        requestAnimationFrame(this.scheduler.bind(this));
+    }
+};
+
+// --- Game Logic ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// *** 物理參數調整區 (Physics Tuning) ***
+const CONFIG = {
+    tileSize: 40,
+
+    // 重力 (Gravity)：稍微調低，讓滯空時間長一點點，比較好控制
+    gravity: 1.2,
+
+    // 跳躍力道 (Jump Force)：加大，確保能跳過 4 格高的水管 (4 * 40 = 160px)
+    // 根據計算 v^2 = 2gh，大約需要 20-21 的力道
+    jumpForce: 21.0,
+
+    // 小跳判定 (Variable Jump)：放開按鍵時的切斷速度
+    jumpCutoff: 6.0,
+
+    // 加速度 (Acceleration)：大幅降低，避免一按就暴衝，增加重量感
+    accel: 0.3,
+
+    // 摩擦力 (Friction)：數值越高越滑 (0.9)，數值越低停越快 (0.7)
+    // 0.86 給予適當的煞車距離
+    friction: 0.86,
+
+    // 空中阻力：空中比地面難轉向
+    airResist: 0.96,
+
+    // 最大速度 (Max Speed)：降低，讓跑步速度適中
+    maxSpeed: 5.5,
+
+    maxFallSpeed: 13,
+    bounceForce: 10
+};
+
+let state = { started: false, gameOver: false, win: false, cameraX: 0, score: 0, frameCount: 0, character: 'mario' };
+const keys = { left: false, right: false, up: false };
+let level = { blocks: [], enemies: [], effects: [], width: 0, flag: null };
+let mario;
+
+window.selectChar = function(char, btn) {
+    state.character = char;
+    document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    event.stopPropagation();
+};
+
+class Entity {
+    constructor(x, y, w, h, type) {
+        this.x = x; this.y = y; this.w = w; this.h = h;
+        this.vx = 0; this.vy = 0; this.type = type;
+        this.grounded = false; this.dead = false; this.remove = false;
+    }
+}
+
+class Mario extends Entity {
+    constructor(x, y) {
+        super(x, y, 30, 30, 'mario');
+        this.facingRight = true;
+    }
+    update() {
+        if (state.gameOver || state.win) return;
+
+        // 水平移動 (加入起步與煞車慣性)
+        let currentAccel = this.grounded ? CONFIG.accel : CONFIG.accel * 0.5; // 空中加速較慢
+
+        if (keys.right) {
+            if (this.vx < CONFIG.maxSpeed) this.vx += currentAccel;
+            this.facingRight = true;
+        } else if (keys.left) {
+            if (this.vx > -CONFIG.maxSpeed) this.vx -= currentAccel;
+            this.facingRight = false;
+        } else {
+            // 沒按鍵時
+            let f = this.grounded ? CONFIG.friction : CONFIG.airResist;
+            this.vx *= f;
+            if(Math.abs(this.vx)<0.1) this.vx=0;
+        }
+
+        // 跳躍
+        if (keys.up && this.grounded) {
+            this.vy = -CONFIG.jumpForce;
+            this.grounded = false;
+            AudioEngine.playJump();
+        }
+        // 可變跳躍高度 (放開按鍵則減速)
+        if (!keys.up && this.vy < -CONFIG.jumpCutoff) {
+            this.vy = -CONFIG.jumpCutoff;
+        }
+
+        this.vy += CONFIG.gravity;
+        if(this.vy > CONFIG.maxFallSpeed) this.vy = CONFIG.maxFallSpeed;
+
+        this.x += this.vx;
+        this.handleCollisions(true);
+        this.y += this.vy;
+        this.grounded = false;
+        this.handleCollisions(false);
+
+        if (this.x < 0) { this.x = 0; this.vx = 0; }
+        if (this.y > canvas.height) die();
+
+        // 攝影機
+        let targetCam = this.x - canvas.width * 0.35;
+        if (targetCam > state.cameraX) state.cameraX = targetCam;
+        if (state.cameraX > level.width - canvas.width) state.cameraX = level.width - canvas.width;
+    }
+
+    handleCollisions(isX) {
+        for (let b of level.blocks) {
+            if (this.x < b.x + b.w && this.x + this.w > b.x &&
+                this.y < b.y + b.h && this.y + this.h > b.y) {
+                if (isX) {
+                    if (this.vx > 0) this.x = b.x - this.w;
+                    else if (this.vx < 0) this.x = b.x + b.w;
+                    this.vx = 0; // 撞牆速度歸零
+                } else {
+                    if (this.vy > 0) {
+                        this.y = b.y - this.h;
+                        this.grounded = true;
+                        this.vy = 0;
+                    } else if (this.vy < 0) {
+                        this.y = b.y + b.h;
+                        this.vy = 0;
+                        if(b.type === 'Q') {
+                            b.type = 'Hit';
+                            createEffect(b.x, b.y, 'coin');
+                            AudioEngine.playCoin();
+                            state.score += 100; updateUI();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    draw() {
+        const x = this.x;
+        const y = this.y;
+        const w = this.w;
+        const h = this.h;
+
+        if (state.character === 'mario') {
+            // Original Mario
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = '#0000ff';
+            ctx.fillRect(x+4, y+16, 22, 14);
+            ctx.fillStyle = '#ffe0bd';
+            let faceX = this.facingRight ? x + 14 : x + 2;
+            ctx.fillRect(faceX, y+4, 14, 12);
+            ctx.fillStyle = '#000';
+            if(this.facingRight) ctx.fillRect(faceX+8, y+6, 4, 2);
+            else ctx.fillRect(faceX+2, y+6, 4, 2);
+
+        } else if (state.character === 'thomas') {
+            // Thomas the Tank Engine (Train Body)
+
+            // Wheels
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(x + 8, y + 26, 4, 0, Math.PI * 2);
+            ctx.arc(x + 22, y + 26, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Main Body (Blue)
+            ctx.fillStyle = '#0077be';
+            if (this.facingRight) {
+                // Cabin
+                ctx.fillRect(x, y + 5, 12, 20);
+                // Boiler
+                ctx.fillRect(x + 12, y + 10, 14, 15);
+                // Funnel
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x + 18, y + 2, 6, 8);
+                // Face (Grey)
+                ctx.fillStyle = '#ddd';
+                ctx.beginPath();
+                ctx.arc(x + 28, y + 17, 6, 0, Math.PI * 2);
+                ctx.fill();
+                // Face Details
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(x + 30, y + 16, 1, 0, Math.PI * 2); // Eye
+                ctx.arc(x + 27, y + 16, 1, 0, Math.PI * 2); // Eye
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 28, y + 19, 2, 0, Math.PI, false); // Smile
+                ctx.stroke();
+
+                // Red Line
+                ctx.fillStyle = '#d00';
+                ctx.fillRect(x, y+22, 30, 3);
+            } else {
+                // Cabin
+                ctx.fillRect(x + 18, y + 5, 12, 20);
+                // Boiler
+                ctx.fillRect(x + 4, y + 10, 14, 15);
+                // Funnel
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x + 6, y + 2, 6, 8);
+                // Face (Grey)
+                ctx.fillStyle = '#ddd';
+                ctx.beginPath();
+                ctx.arc(x + 2, y + 17, 6, 0, Math.PI * 2);
+                ctx.fill();
+                // Face Details
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(x + 0, y + 16, 1, 0, Math.PI * 2); // Eye
+                ctx.arc(x + 3, y + 16, 1, 0, Math.PI * 2); // Eye
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x + 2, y + 19, 2, 0, Math.PI, false); // Smile
+                ctx.stroke();
+
+                // Red Line
+                ctx.fillStyle = '#d00';
+                ctx.fillRect(x, y+22, 30, 3);
+            }
+
+        } else if (state.character === 'po') {
+            // Teletubby (Po - Red)
+            ctx.fillStyle = '#e60000'; // Red body
+
+            // Head
+            ctx.beginPath();
+            ctx.arc(x + w/2, y + h*0.3, w*0.35, 0, Math.PI*2);
+            ctx.fill();
+
+            // Body
+            ctx.beginPath();
+            ctx.ellipse(x + w/2, y + h*0.7, w*0.4, h*0.35, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // Antenna (Circle for Po)
+            ctx.strokeStyle = '#e60000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + w/2, y);
+            ctx.lineTo(x + w/2, y - 6);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x + w/2, y - 9, 3, 0, Math.PI*2);
+            ctx.stroke();
+
+            // Face (Flesh color)
+            ctx.fillStyle = '#ffdbac';
+            ctx.beginPath();
+            ctx.arc(x + w/2, y + h*0.3, w*0.22, 0, Math.PI*2);
+            ctx.fill();
+
+            // Eyes
+            ctx.fillStyle = '#000';
+            const look = this.facingRight ? 1 : -1;
+            ctx.beginPath();
+            ctx.arc(x + w/2 - 3 + look, y + h*0.28, 1.5, 0, Math.PI*2);
+            ctx.arc(x + w/2 + 3 + look, y + h*0.28, 1.5, 0, Math.PI*2);
+            ctx.fill();
+
+            // Smile
+            ctx.beginPath();
+            ctx.arc(x + w/2 + look, y + h*0.33, 3, 0.2*Math.PI, 0.8*Math.PI);
+            ctx.stroke();
+
+            // Tummy Screen (Silver)
+            ctx.fillStyle = '#d0d0d0';
+            ctx.fillRect(x + w*0.3, y + h*0.6, w*0.4, h*0.25);
+
+            // Arms
+            ctx.strokeStyle = '#e60000';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            if(this.facingRight) {
+                ctx.moveTo(x + w*0.7, y + h*0.5);
+                ctx.lineTo(x + w, y + h*0.4);
+            } else {
+                ctx.moveTo(x + w*0.3, y + h*0.5);
+                ctx.lineTo(x, y + h*0.4);
+            }
+            ctx.stroke();
+        }
+    }
+}
+
+class Goomba extends Entity {
+    constructor(x, y) {
+        super(x, y, 40, 40, 'goomba');
+        this.vx = -1.5; // 敵人速度也稍微調慢一點配合
+        this.color = '#8b4513';
+    }
+    update() {
+        if (this.dead) {
+            this.vy += CONFIG.gravity; this.y += this.vy;
+            if(this.y>canvas.height) this.remove=true;
+            return;
+        }
+        this.vy += CONFIG.gravity;
+        this.x += this.vx; this.handleCollisions(true);
+        this.y += this.vy; this.handleCollisions(false);
+    }
+    handleCollisions(isX) {
+        for (let b of level.blocks) {
+            if (this.x < b.x + b.w && this.x + this.w > b.x &&
+                this.y < b.y + b.h && this.y + this.h > b.y) {
+                if (isX) {
+                    this.vx *= -1;
+                    if(this.vx>0) this.x=b.x+b.w; else this.x=b.x-this.w;
+                } else {
+                    if (this.vy > 0) { this.y = b.y - this.h; this.vy = 0; }
+                }
+            }
+        }
+    }
+    draw() {
+        if (this.dead) {
+            ctx.fillStyle = this.color; ctx.globalAlpha = 0.7;
+            ctx.fillRect(this.x, this.y+20, this.w, this.h/2);
+            ctx.globalAlpha = 1.0; return;
+        }
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(this.x+20,this.y+20,18,0,Math.PI*2); ctx.fill();
+        ctx.fillRect(this.x+10,this.y+25,20,15);
+        state.frameCount++;
+        let walk = Math.sin(state.frameCount*0.15)*3; // 敵人動畫速度
+        ctx.fillStyle='#000';
+        ctx.fillRect(this.x+10-walk,this.y+35,8,5); ctx.fillRect(this.x+22+walk,this.y+35,8,5);
+    }
+}
+
+function createEffect(x, y, type) {
+    level.effects.push({x, y, vy: -5, life: 30, type});
+}
+
+function initLevel() {
+    level.blocks=[]; level.enemies=[]; level.effects=[];
+    state.gameOver=false; state.win=false; state.cameraX=0; state.score=0;
+    updateUI();
+
+    let T = CONFIG.tileSize;
+    const add = (x, y, w, h, t) => level.blocks.push({x:x*T, y:y*T, w:w*T, h:h*T, type:t});
+
+    // 地面
+    add(0,10,69,2,'G'); add(71,10,15,2,'G'); add(89,10,64,2,'G'); add(155,10,50,2,'G');
+
+    const mapData = [
+        {x:16,y:6,t:'Q'}, {x:20,y:6,t:'B'}, {x:21,y:6,t:'Q'}, {x:22,y:6,t:'B'}, {x:23,y:6,t:'Q'}, {x:24,y:6,t:'B'}, {x:22,y:2,t:'Q'},
+        {x:77,y:6,t:'B'}, {x:78,y:6,t:'Q'}, {x:79,y:6,t:'B'}, {x:80,y:2,t:'B'}, {x:81,y:2,t:'B'}, {x:82,y:2,t:'B'}, {x:83,y:2,t:'B'}, {x:84,y:2,t:'B'}, {x:85,y:2,t:'B'}, {x:86,y:2,t:'B'}, {x:87,y:2,t:'B'},
+        {x:91,y:2,t:'B'}, {x:92,y:2,t:'B'}, {x:93,y:2,t:'Q'}, {x:94,y:2,t:'B'}, {x:94,y:6,t:'B'},
+        {x:100,y:6,t:'B'}, {x:101,y:6,t:'B'}, {x:118,y:6,t:'B'},
+        {x:121,y:6,t:'Q'}, {x:122,y:6,t:'Q'}, {x:123,y:6,t:'Q'}, {x:129,y:6,t:'Q'}, {x:130,y:2,t:'Q'}
+    ];
+    mapData.forEach(d => add(d.x, d.y, 1, 1, d.t));
+
+    add(28,8,2,2,'P'); add(38,7,2,3,'P'); add(46,6,2,4,'P'); add(57,6,2,4,'P'); add(163,8,2,2,'P');
+    for(let i=0; i<8; i++) { for(let j=0; j<=i; j++) add(134+i,9-j,1,1,'S'); }
+
+    [22, 40, 51, 52.5, 80, 82, 97, 98.5, 114, 115.5, 124, 125.5].forEach(x => {
+        level.enemies.push(new Goomba(x*T, 8*T));
+    });
+
+    level.flag = {x: 198*T, y: 2*T};
+    level.width = 210*T;
+    mario = new Mario(2*T, 8*T);
+}
+
+function checkEntityCollide(e1, e2) {
+    return (e1.x < e2.x + e2.w && e1.x + e1.w > e2.x &&
+            e1.y < e2.y + e2.h && e1.y + e1.h > e2.y);
+}
+
+function update() {
+    if (!state.started) return;
+    mario.update();
+    level.enemies.forEach(e => {
+        if (Math.abs(e.x - mario.x) < 800) {
+            e.update();
+            if (!e.dead && !mario.dead && checkEntityCollide(mario, e)) {
+                if (mario.vy > 0 && mario.y + mario.h < e.y + e.h/2 + 15) {
+                    e.dead = true; e.vx = 0; e.vy = -5;
+                    mario.vy = -CONFIG.bounceForce;
+                    AudioEngine.playStomp();
+                    createEffect(e.x, e.y, 'hit');
+                    state.score += 100; updateUI();
+                } else {
+                    die();
+                }
+            }
+        }
+    });
+    level.enemies = level.enemies.filter(e => !e.remove);
+    level.effects.forEach(f => { f.y+=f.vy; f.life--; });
+    level.effects = level.effects.filter(f => f.life > 0);
+    if(mario.x > 198 * CONFIG.tileSize) winGame();
+}
+
+function draw() {
+    ctx.fillStyle = '#5c94fc'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(-Math.floor(state.cameraX), 0);
+
+    level.blocks.forEach(b => {
+        if(b.x+b.w < state.cameraX || b.x > state.cameraX+canvas.width) return;
+        if (b.type === 'G') {
+            ctx.fillStyle = '#c84c0c'; ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.fillStyle = '#85cf5b'; ctx.fillRect(b.x, b.y, b.w, 5);
+        } else if (b.type === 'B' || b.type === 'S') {
+            ctx.fillStyle = '#b85c2c'; ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.strokeStyle = '#000'; ctx.strokeRect(b.x, b.y, b.w, b.h);
+        } else if (b.type === 'Q') {
+            ctx.fillStyle = '#fc9838'; ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.fillStyle = '#8a5700'; ctx.font = 'bold 24px monospace'; ctx.fillText('?', b.x+12, b.y+28);
+        } else if (b.type === 'Hit') {
+            ctx.fillStyle = '#916545'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h);
+        } else if (b.type === 'P') {
+            ctx.fillStyle = '#24a018'; ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.strokeStyle = '#000'; ctx.strokeRect(b.x, b.y, b.w, b.h);
+            ctx.fillRect(b.x-4, b.y, b.w+8, 30); ctx.strokeRect(b.x-4, b.y, b.w+8, 30);
+        }
+    });
+
+    ctx.fillStyle = '#fff'; ctx.fillRect(level.flag.x+10, level.flag.y, 5, 8*CONFIG.tileSize);
+    ctx.fillStyle = 'green'; ctx.beginPath(); ctx.arc(level.flag.x+12.5, level.flag.y, 10, 0, Math.PI*2); ctx.fill();
+    if (state.win) { ctx.fillStyle = 'red'; ctx.fillRect(level.flag.x+15, level.flag.y+8*CONFIG.tileSize-40, 30, 20); }
+
+    level.enemies.forEach(e => e.draw());
+    level.effects.forEach(f => {
+        ctx.fillStyle = '#ffeb3b'; ctx.fillRect(f.x+10, f.y, 20, 5);
+        ctx.font = '12px Arial'; ctx.fillText("100", f.x, f.y);
+    });
+
+    if(!state.gameOver) mario.draw();
+    ctx.restore();
+}
+
+function updateUI() { document.getElementById('score').innerText = state.score; }
+function die() {
+    if(state.gameOver) return;
+    state.gameOver = true; AudioEngine.isPlaying = false; AudioEngine.playDie();
+    setTimeout(() => {
+        document.getElementById('start-screen').style.display = 'flex';
+        document.querySelector('#start-screen h1').innerText = "GAME OVER";
+        document.querySelector('#start-screen p').innerText = "點擊重新開始";
+        state.started = false;
+    }, 2000);
+}
+function winGame() {
+    if(state.win) return;
+    state.win = true; AudioEngine.playCoin();
+    setTimeout(() => {
+        document.getElementById('start-screen').style.display = 'flex';
+        document.querySelector('#start-screen h1').innerText = "COURSE CLEAR!";
+        document.querySelector('#start-screen p').innerText = "點擊重新開始";
+        state.started = false;
+    }, 1000);
+}
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+function startGame() {
+    if (state.started) return;
+    AudioEngine.init(); AudioEngine.resume(); AudioEngine.startMusic();
+    initLevel(); state.started = true;
+    document.getElementById('start-screen').style.display = 'none';
+}
+document.getElementById('start-screen').addEventListener('click', startGame);
+document.getElementById('start-screen').addEventListener('touchstart', startGame);
+window.addEventListener('keydown', e => { if(!state.started) startGame(); });
+window.addEventListener('keydown', e => {
+    if(e.code === 'ArrowRight') keys.right = true;
+    if(e.code === 'ArrowLeft') keys.left = true;
+    if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyZ') keys.up = true;
+});
+window.addEventListener('keyup', e => {
+    if(e.code === 'ArrowRight') keys.right = false;
+    if(e.code === 'ArrowLeft') keys.left = false;
+    if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyZ') keys.up = false;
+});
+document.getElementById('sound-toggle').addEventListener('click', (e) => {
+    e.stopPropagation(); let muted = AudioEngine.toggleMute();
+    e.target.innerText = muted ? "🔇 聲音: 關" : "🔊 聲音: 開";
+});
+const bindTouch = (id, k) => {
+    let btn = document.getElementById(id);
+    btn.addEventListener('touchstart', e => { e.preventDefault(); keys[k] = true; });
+    btn.addEventListener('touchend', e => { e.preventDefault(); keys[k] = false; });
+    btn.addEventListener('mousedown', e => { keys[k] = true; });
+    btn.addEventListener('mouseup', e => { keys[k] = false; });
+};
+bindTouch('btn-left', 'left'); bindTouch('btn-right', 'right'); bindTouch('btn-jump', 'up');
+document.getElementById('btn-reset').addEventListener('touchstart', () => { if(state.started) initLevel(); });
+document.getElementById('btn-reset').addEventListener('click', () => { if(state.started) initLevel(); });
+
+initLevel(); loop();
+</script>
+</body>
+</html>
