@@ -86,17 +86,30 @@ layout: default
       <div class="section-divider"></div>
     </div>
     <div class="projects-grid">
-      <div class="project-card">
-        <div class="project-image"></div>
+      <a href="8d-hypercube.html" class="project-card project-link">
+        <div class="project-image project-8d"></div>
         <div class="project-content">
-          <h3>Coming Soon</h3>
-          <p>I'm currently working on some exciting projects. Check back soon for updates!</p>
+          <h3>8D Hypercube Visualization</h3>
+          <p>An interactive visualization of the 8-dimensional hypercube (Octeract) with 256 vertices and 1024 edges, projected down to 2D through 6 successive projections.</p>
           <div class="project-tags">
-            <span class="tag">React</span>
-            <span class="tag">Node.js</span>
+            <span class="tag">Canvas</span>
+            <span class="tag">JavaScript</span>
+            <span class="tag">Math</span>
           </div>
         </div>
-      </div>
+      </a>
+      <a href="gemini3-demo.html" class="project-card project-link">
+        <div class="project-image project-game"></div>
+        <div class="project-content">
+          <h3>Super Mario Game</h3>
+          <p>A browser-based platformer game featuring multiple playable characters, custom physics engine, and touch controls for mobile devices.</p>
+          <div class="project-tags">
+            <span class="tag">Canvas</span>
+            <span class="tag">Game Dev</span>
+            <span class="tag">Web Audio</span>
+          </div>
+        </div>
+      </a>
     </div>
   </div>
 </section>
@@ -370,21 +383,61 @@ layout: default
     box-shadow: 0 15px 35px rgba(0,0,0,0.1);
   }
 
+  .project-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .project-link:hover {
+    text-decoration: none;
+  }
+
   .project-image {
     height: 200px;
     background: linear-gradient(135deg, #667eea, #764ba2);
     position: relative;
+    overflow: hidden;
+  }
+
+  .project-image::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1) 0%, transparent 60%);
   }
 
   .project-image::after {
-    content: 'CODE';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: bold;
     color: white;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  .project-8d {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  }
+
+  .project-8d::after {
+    content: '8D';
+    font-family: 'Courier New', monospace;
+    letter-spacing: 4px;
+  }
+
+  .project-game {
+    background: linear-gradient(135deg, #f59e0b 0%, #ef4444 50%, #ec4899 100%);
+  }
+
+  .project-game::after {
+    content: 'GAME';
+    letter-spacing: 2px;
   }
 
   .project-content {
