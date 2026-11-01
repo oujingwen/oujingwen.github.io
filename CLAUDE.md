@@ -51,7 +51,11 @@ Animations:
 A standalone page (no front matter) with its UI written in Traditional Chinese (`lang="zh-TW"`):
 - Canvas-based projections of the 8-dimensional hypercube, rendered with vanilla JavaScript (no external libraries)
 - Sections: octeract statistics, six projection views, and a comparison table of hypercubes across dimensions
-- Light theme with indigo/violet accents defined as CSS custom properties; font: Noto Sans TC
+- Shares the homepage's visual style: same color tokens (`--accent`, `--accent-strong`, etc.), fonts (Instrument Serif / DM Sans / JetBrains Mono, with Noto Serif TC / Noto Sans TC for Chinese), fixed nav with a link back to the portfolio, scroll progress bar, drifting background blobs
+- Animations: scroll-reveal for sections and stat cards, count-up stats (`data-count`), staggered table rows, a highlight that cycles through the 8D -> 2D dimension nodes, ripple on button press, pulsing auto-rotate button while rotating
+- The animation script at the end of `<body>` wraps the global `autoRotate` / `stopRotation` functions to toggle the `.running` class; keep these functions global since the buttons call them via inline `onclick`
+- The canvas edge colors (HSL by the s coordinate) encode data and are independent of the page theme
+- `prefers-reduced-motion: reduce` disables animations
 - Responsive breakpoint at 768px
 
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
