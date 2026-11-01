@@ -65,6 +65,9 @@ A standalone Super Mario-style platformer written in vanilla JavaScript:
 - Touch controls for mobile devices
 - Web Audio API for sound effects and background music
 - Game features: enemies (Goombas), collectible coins, platforms, pipes, and flag goal
+- Page chrome shares the homepage's visual style: color tokens, fonts, noise overlay, drifting background blobs, fixed nav with a link back to the portfolio (root-relative `/` links, so they work from both `/gemini3-demo.html` and `/gemini3-demo/`), animated gradient frame around the game, frosted light start/game-over overlay, pill-shaped character buttons, keyboard hints on desktop, light touch buttons on mobile
+- The canvas is scaled with CSS to fit the viewport height (`--chrome-h` is the vertical space reserved for everything except the canvas); its internal resolution stays 800x450
+- The game script looks up `#start-screen h1` and `#start-screen p` to change the overlay text, so keep a single `h1` and make the start prompt the first `p` inside `#start-screen`
 
 `gemini3-demo/index.html` is an identical copy that exposes the `/gemini3-demo` route. **When editing the game, apply the same change to both files** (or keep them in sync with `cp gemini3-demo.html gemini3-demo/index.html`).
 
