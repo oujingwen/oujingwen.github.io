@@ -4,6 +4,7 @@ layout: null
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>document.documentElement.classList.add('js');</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ site.title }} - Developer</title>
@@ -13,18 +14,22 @@ layout: null
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-primary: #0a0a0b;
-      --bg-secondary: #111113;
-      --bg-card: #18181b;
-      --bg-elevated: #1f1f23;
-      --text-primary: #fafafa;
-      --text-secondary: #a1a1aa;
-      --text-muted: #71717a;
-      --accent: #f97316;
-      --accent-soft: rgba(249, 115, 22, 0.15);
-      --accent-glow: rgba(249, 115, 22, 0.4);
-      --border: rgba(255, 255, 255, 0.06);
-      --border-accent: rgba(249, 115, 22, 0.3);
+      --bg-primary: #fbfaf8;
+      --bg-secondary: #f4f2ee;
+      --bg-card: #ffffff;
+      --bg-elevated: #f4f4f5;
+      --text-primary: #18181b;
+      --text-secondary: #52525b;
+      --text-muted: #6b6b73;
+      --accent: #ea580c;
+      --accent-strong: #c2410c;
+      --accent-soft: rgba(234, 88, 12, 0.08);
+      --accent-glow: rgba(234, 88, 12, 0.28);
+      --border: rgba(24, 24, 27, 0.08);
+      --border-accent: rgba(234, 88, 12, 0.35);
+      --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04), 0 4px 12px rgba(24, 24, 27, 0.04);
+      --shadow-lg: 0 24px 48px rgba(24, 24, 27, 0.12);
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     * {
@@ -54,7 +59,7 @@ layout: null
       width: 100%;
       height: 100%;
       pointer-events: none;
-      opacity: 0.025;
+      opacity: 0.035;
       z-index: 1000;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
     }
@@ -73,7 +78,33 @@ layout: null
       right: 0;
       z-index: 100;
       padding: 24px 0;
-      background: linear-gradient(to bottom, var(--bg-primary) 0%, transparent 100%);
+      background: transparent;
+      border-bottom: 1px solid transparent;
+      transition: padding 0.4s var(--ease-out), background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+      animation: slideDown 0.8s var(--ease-out) both;
+    }
+
+    nav.scrolled {
+      padding: 14px 0;
+      background: rgba(251, 250, 248, 0.82);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      border-bottom-color: var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Scroll progress bar */
+    .scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), #ec4899, #8b5cf6);
+      transform-origin: 0 50%;
+      transform: scaleX(0);
+      z-index: 101;
+      pointer-events: none;
     }
 
     .nav-inner {
@@ -92,6 +123,13 @@ layout: null
       color: var(--text-primary);
       text-decoration: none;
       letter-spacing: -0.02em;
+      display: inline-block;
+      transition: transform 0.4s var(--ease-out), color 0.3s ease;
+    }
+
+    .logo:hover {
+      color: var(--accent);
+      transform: rotate(-6deg) scale(1.08);
     }
 
     .nav-links {
@@ -107,9 +145,34 @@ layout: null
       text-decoration: none;
       transition: color 0.2s ease;
       letter-spacing: 0.02em;
+      position: relative;
+      padding: 4px 0;
+    }
+
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform 0.35s var(--ease-out);
     }
 
     .nav-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-links a:hover::after,
+    .nav-links a.active::after {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+
+    .nav-links a.active {
       color: var(--text-primary);
     }
 
@@ -120,6 +183,67 @@ layout: null
       align-items: center;
       position: relative;
       padding: 120px 0 80px;
+      overflow: hidden;
+    }
+
+    /* Animated background blobs */
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(70px);
+      opacity: 0.45;
+      will-change: transform;
+    }
+
+    .blob-1 {
+      width: 480px;
+      height: 480px;
+      top: -120px;
+      right: -80px;
+      background: radial-gradient(circle, #fdba74 0%, transparent 70%);
+      animation: drift1 18s ease-in-out infinite alternate;
+    }
+
+    .blob-2 {
+      width: 420px;
+      height: 420px;
+      bottom: -140px;
+      left: -100px;
+      background: radial-gradient(circle, #c4b5fd 0%, transparent 70%);
+      animation: drift2 22s ease-in-out infinite alternate;
+    }
+
+    .blob-3 {
+      width: 320px;
+      height: 320px;
+      top: 40%;
+      left: 45%;
+      background: radial-gradient(circle, #f9a8d4 0%, transparent 70%);
+      opacity: 0.3;
+      animation: drift3 26s ease-in-out infinite alternate;
+    }
+
+    /* Dot grid */
+    .hero-bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(24, 24, 27, 0.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+      -webkit-mask-image: radial-gradient(ellipse at 70% 40%, #000 0%, transparent 65%);
+      mask-image: radial-gradient(ellipse at 70% 40%, #000 0%, transparent 65%);
+    }
+
+    .hero .wrapper {
+      position: relative;
+      z-index: 1;
     }
 
     .hero-grid {
@@ -140,11 +264,11 @@ layout: null
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
       font-weight: 500;
-      color: var(--accent);
+      color: var(--accent-strong);
       text-transform: uppercase;
       letter-spacing: 0.15em;
       margin-bottom: 24px;
-      animation: fadeInUp 0.8s ease both;
+      animation: fadeInUp 0.8s var(--ease-out) both;
     }
 
     .hero-label::before {
@@ -152,6 +276,17 @@ layout: null
       width: 24px;
       height: 1px;
       background: var(--accent);
+      transform-origin: left;
+      animation: growX 0.8s var(--ease-out) 0.3s both;
+    }
+
+    .hero-label::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
     }
 
     .hero-title {
@@ -161,12 +296,32 @@ layout: null
       line-height: 1.05;
       letter-spacing: -0.03em;
       margin-bottom: 24px;
-      animation: fadeInUp 0.8s ease 0.1s both;
+    }
+
+    /* Word-by-word title reveal */
+    .hero-title .word {
+      display: inline-block;
+      overflow: hidden;
+      vertical-align: top;
+      padding-bottom: 0.08em;
+      margin-bottom: -0.08em;
+    }
+
+    .hero-title .word > span {
+      display: inline-block;
+      animation: wordUp 0.9s var(--ease-out) both;
+      animation-delay: calc(0.12s + var(--i, 0) * 0.08s);
     }
 
     .hero-title em {
       font-style: italic;
-      color: var(--accent);
+      background: linear-gradient(100deg, #ea580c 0%, #ec4899 50%, #ea580c 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: shimmer 6s linear infinite;
+      padding-right: 0.06em;
     }
 
     .hero-desc {
@@ -174,13 +329,13 @@ layout: null
       color: var(--text-secondary);
       max-width: 440px;
       margin-bottom: 40px;
-      animation: fadeInUp 0.8s ease 0.2s both;
+      animation: fadeInUp 0.8s var(--ease-out) 0.55s both;
     }
 
     .hero-cta {
       display: flex;
       gap: 16px;
-      animation: fadeInUp 0.8s ease 0.3s both;
+      animation: fadeInUp 0.8s var(--ease-out) 0.7s both;
     }
 
     .btn {
@@ -193,52 +348,91 @@ layout: null
       font-weight: 500;
       text-decoration: none;
       border-radius: 6px;
-      transition: all 0.3s ease;
+      transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
       cursor: pointer;
       border: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn .arrow {
+      display: inline-block;
+      transition: transform 0.3s var(--ease-out);
+    }
+
+    .btn:hover .arrow {
+      transform: translateX(4px);
     }
 
     .btn-primary {
-      background: var(--accent);
+      background: var(--accent-strong);
       color: white;
     }
 
+    /* Sheen sweep on hover */
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -75%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transform: skewX(-20deg);
+      transition: left 0.6s var(--ease-out);
+    }
+
+    .btn-primary:hover::before {
+      left: 125%;
+    }
+
     .btn-primary:hover {
-      background: #ea580c;
+      background: #9a3412;
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px var(--accent-glow);
+      box-shadow: 0 10px 24px var(--accent-glow);
     }
 
     .btn-ghost {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.6);
       color: var(--text-primary);
-      border: 1px solid var(--border);
+      border: 1px solid rgba(24, 24, 27, 0.14);
     }
 
     .btn-ghost:hover {
-      border-color: var(--text-secondary);
+      border-color: var(--text-primary);
       background: var(--bg-card);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
     }
 
     /* Hero Visual */
     .hero-visual {
       position: relative;
       height: 500px;
-      animation: fadeIn 1s ease 0.4s both;
+      perspective: 1000px;
     }
 
+    /* Outer element: entrance + parallax offset; inner card: float + hover */
     .visual-card {
       position: absolute;
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 16px;
       overflow: hidden;
-      transition: transform 0.4s ease, box-shadow 0.4s ease;
+      box-shadow: var(--shadow-sm);
+      text-decoration: none;
+      rotate: var(--rot, 0deg);
+      translate: var(--px, 0px) var(--py, 0px);
+      transition: rotate 0.5s var(--ease-out), scale 0.5s var(--ease-out), box-shadow 0.5s ease, translate 0.6s var(--ease-out);
+      animation: cardIn 1s var(--ease-out) both, float 6s ease-in-out infinite;
+      animation-delay: var(--delay, 0.4s), calc(var(--delay, 0.4s) + 1s);
     }
 
     .visual-card:hover {
-      transform: translateY(-8px) rotate(0deg) !important;
-      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+      rotate: 0deg;
+      scale: 1.05;
+      box-shadow: var(--shadow-lg);
+      animation-play-state: running, paused;
     }
 
     .card-1 {
@@ -246,11 +440,19 @@ layout: null
       height: 180px;
       top: 0;
       right: 60px;
-      transform: rotate(3deg);
-      background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+      --rot: 3deg;
+      --delay: 0.45s;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899, #8b5cf6, #6366f1);
+      background-size: 300% 300%;
       display: flex;
       align-items: center;
       justify-content: center;
+      animation: cardIn 1s var(--ease-out) both, float 6s ease-in-out infinite, gradientShift 8s ease infinite;
+      animation-delay: var(--delay), calc(var(--delay) + 1s), 0s;
+    }
+
+    .card-1:hover {
+      animation-play-state: running, paused, running;
     }
 
     .card-1-inner {
@@ -266,11 +468,19 @@ layout: null
       height: 160px;
       top: 160px;
       right: 0;
-      transform: rotate(-2deg);
-      background: linear-gradient(135deg, #f97316, #ef4444, #ec4899);
+      --rot: -2deg;
+      --delay: 0.6s;
+      background: linear-gradient(135deg, #f97316, #ef4444, #ec4899, #ef4444, #f97316);
+      background-size: 300% 300%;
       display: flex;
       align-items: center;
       justify-content: center;
+      animation: cardIn 1s var(--ease-out) both, float 7s ease-in-out infinite reverse, gradientShift 9s ease infinite;
+      animation-delay: var(--delay), calc(var(--delay) + 1s), 0s;
+    }
+
+    .card-2:hover {
+      animation-play-state: running, paused, running;
     }
 
     .card-2-inner {
@@ -285,14 +495,16 @@ layout: null
       padding: 20px;
       bottom: 40px;
       right: 100px;
-      transform: rotate(1deg);
+      --rot: 1deg;
+      --delay: 0.75s;
+      animation-duration: 1s, 8s;
     }
 
     .stat-number {
       font-family: 'JetBrains Mono', monospace;
       font-size: 2rem;
       font-weight: 500;
-      color: var(--accent);
+      color: var(--accent-strong);
       margin-bottom: 4px;
     }
 
@@ -311,10 +523,11 @@ layout: null
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem;
       font-weight: 500;
-      color: var(--accent);
+      color: var(--accent-strong);
       text-transform: uppercase;
       letter-spacing: 0.15em;
       margin-bottom: 16px;
+      display: inline-block;
     }
 
     .section-title {
@@ -367,19 +580,22 @@ layout: null
       border-radius: 12px;
       padding: 28px 24px;
       text-align: center;
-      transition: all 0.3s ease;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.4s var(--ease-out), border-color 0.3s ease, box-shadow 0.4s ease;
     }
 
     .stat-card:hover {
       border-color: var(--border-accent);
-      transform: translateY(-4px);
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-lg);
     }
 
     .stat-card .number {
       font-family: 'JetBrains Mono', monospace;
       font-size: 2.25rem;
       font-weight: 500;
-      color: var(--accent);
+      color: var(--accent-strong);
+      font-variant-numeric: tabular-nums;
       margin-bottom: 8px;
     }
 
@@ -400,9 +616,25 @@ layout: null
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 32px 24px;
-      transition: all 0.3s ease;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.4s var(--ease-out), border-color 0.3s ease, box-shadow 0.4s ease;
       position: relative;
       overflow: hidden;
+    }
+
+    /* Cursor-following spotlight (position set by JS) */
+    .skill-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .skill-card:hover::after {
+      opacity: 1;
     }
 
     .skill-card::before {
@@ -412,25 +644,33 @@ layout: null
       left: 0;
       width: 100%;
       height: 2px;
-      background: linear-gradient(90deg, var(--accent), transparent);
-      opacity: 0;
-      transition: opacity 0.3s ease;
+      background: linear-gradient(90deg, var(--accent), #ec4899, transparent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.5s var(--ease-out);
     }
 
     .skill-card:hover {
       border-color: var(--border-accent);
-      transform: translateY(-4px);
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-lg);
     }
 
     .skill-card:hover::before {
-      opacity: 1;
+      transform: scaleX(1);
     }
 
     .skill-icon {
       font-family: 'JetBrains Mono', monospace;
       font-size: 1.5rem;
-      color: var(--accent);
+      color: var(--accent-strong);
       margin-bottom: 16px;
+      display: inline-block;
+      transition: transform 0.5s var(--ease-out);
+    }
+
+    .skill-card:hover .skill-icon {
+      transform: translateY(-3px) rotate(-8deg) scale(1.15);
     }
 
     .skill-card h3 {
@@ -464,13 +704,28 @@ layout: null
       overflow: hidden;
       text-decoration: none;
       color: inherit;
-      transition: all 0.4s ease;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.5s var(--ease-out), border-color 0.3s ease, box-shadow 0.5s ease;
     }
 
     .project-card:hover {
       border-color: var(--border-accent);
       transform: translateY(-8px);
-      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .project-card h3::after {
+      content: ' \2192';
+      display: inline-block;
+      opacity: 0;
+      transform: translateX(-8px);
+      transition: opacity 0.3s ease, transform 0.4s var(--ease-out);
+      color: var(--accent-strong);
+    }
+
+    .project-card:hover h3::after {
+      opacity: 1;
+      transform: translateX(0);
     }
 
     .project-image {
@@ -480,6 +735,8 @@ layout: null
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      background-size: 250% 250% !important;
+      animation: gradientShift 10s ease infinite;
     }
 
     .project-image::after {
@@ -488,6 +745,30 @@ layout: null
       font-weight: 500;
       color: white;
       letter-spacing: 3px;
+      position: relative;
+      transition: transform 0.6s var(--ease-out), letter-spacing 0.6s var(--ease-out);
+    }
+
+    .project-card:hover .project-image::after {
+      transform: scale(1.15);
+      letter-spacing: 8px;
+    }
+
+    /* Rotating wireframe square behind the label */
+    .project-image::before {
+      content: '';
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 12px;
+      animation: spin 24s linear infinite;
+    }
+
+    .project-game::before {
+      border-radius: 50%;
+      border-style: dashed;
+      animation-duration: 18s;
     }
 
     .project-8d {
@@ -576,18 +857,77 @@ layout: null
       text-decoration: none;
       color: var(--text-primary);
       font-weight: 500;
-      transition: all 0.3s ease;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.3s var(--ease-out), border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
     }
 
     .contact-link:hover {
       border-color: var(--accent);
       background: var(--accent-soft);
-      transform: translateY(-2px);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px var(--accent-glow);
     }
 
     .contact-link svg {
       width: 20px;
       height: 20px;
+      transition: transform 0.6s var(--ease-out);
+    }
+
+    .contact-link:hover svg {
+      transform: rotate(360deg);
+    }
+
+    #contact {
+      overflow: hidden;
+    }
+
+    #contact::before {
+      content: '';
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      left: 50%;
+      top: 50%;
+      margin: -300px 0 0 -300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(253, 186, 116, 0.35) 0%, transparent 65%);
+      animation: breathe 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    #contact .wrapper {
+      position: relative;
+    }
+
+    /* Scroll reveal (only hidden when JS is running) */
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(32px);
+      transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out);
+      transition-delay: var(--reveal-delay, 0s);
+    }
+
+    .js .reveal.in-view {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* Once revealed (class added by JS), restore the cards' quick hover transitions */
+    .js .reveal.settled.stat-card,
+    .js .reveal.settled.skill-card,
+    .js .reveal.settled.project-card {
+      transition: opacity 0.9s var(--ease-out), transform 0.5s var(--ease-out), border-color 0.3s ease, box-shadow 0.5s ease;
+      transition-delay: 0s;
+    }
+
+    .js .reveal.in-view.stat-card:hover,
+    .js .reveal.in-view.skill-card:hover {
+      transform: translateY(-6px);
+    }
+
+    .js .reveal.in-view.project-card:hover {
+      transform: translateY(-8px);
     }
 
     /* Footer */
@@ -617,6 +957,83 @@ layout: null
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-100%); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes wordUp {
+      from { transform: translateY(110%); }
+      to { transform: translateY(0); }
+    }
+
+    @keyframes growX {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.7); }
+    }
+
+    @keyframes shimmer {
+      to { background-position: 200% center; }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(40px) scale(0.92); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes float {
+      0%, 100% { margin-top: 0; }
+      50% { margin-top: -12px; }
+    }
+
+    @keyframes gradientShift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: scale(0.9); opacity: 0.7; }
+      50% { transform: scale(1.1); opacity: 1; }
+    }
+
+    @keyframes drift1 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-120px, 80px) scale(1.15); }
+    }
+
+    @keyframes drift2 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(140px, -60px) scale(1.1); }
+    }
+
+    @keyframes drift3 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-80px, -100px) scale(0.85); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+
+      .js .reveal {
+        opacity: 1;
+        transform: none;
+      }
     }
 
     /* Responsive */
@@ -691,9 +1108,10 @@ layout: null
       }
 
       .card-3 {
-        width: 160px;
+        width: 150px;
         bottom: 0;
-        right: 20%;
+        right: auto;
+        left: 0;
       }
 
       .stats-grid {
@@ -734,6 +1152,7 @@ layout: null
   </style>
 </head>
 <body>
+  <div class="scroll-progress" aria-hidden="true"></div>
   <!-- Navigation -->
   <nav>
     <div class="nav-inner">
@@ -749,14 +1168,19 @@ layout: null
 
   <!-- Hero Section -->
   <section class="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
     <div class="wrapper">
       <div class="hero-grid">
         <div class="hero-content">
           <span class="hero-label">Software Developer</span>
-          <h1 class="hero-title">Creating <em>digital</em> experiences that matter</h1>
+          <h1 class="hero-title" aria-label="Creating digital experiences that matter"><span aria-hidden="true"><span class="word"><span style="--i:0">Creating</span></span> <span class="word"><span style="--i:1"><em>digital</em></span></span> <span class="word"><span style="--i:2">experiences</span></span> <span class="word"><span style="--i:3">that</span></span> <span class="word"><span style="--i:4">matter</span></span></span></h1>
           <p class="hero-desc">I'm Jan, a developer passionate about building meaningful applications and exploring the intersection of mathematics and visual computing.</p>
           <div class="hero-cta">
-            <a href="#projects" class="btn btn-primary">View Projects</a>
+            <a href="#projects" class="btn btn-primary">View Projects <span class="arrow">&rarr;</span></a>
             <a href="#contact" class="btn btn-ghost">Get In Touch</a>
           </div>
         </div>
@@ -768,7 +1192,7 @@ layout: null
             <span class="card-2-inner">GAME</span>
           </a>
           <div class="visual-card card-3">
-            <div class="stat-number">5+</div>
+            <div class="stat-number" data-count="5" data-suffix="+">5+</div>
             <div class="stat-label">Years of Experience</div>
           </div>
         </div>
@@ -791,15 +1215,15 @@ layout: null
         </div>
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="number">5+</div>
+            <div class="number" data-count="5" data-suffix="+">5+</div>
             <div class="label">Years Experience</div>
           </div>
           <div class="stat-card">
-            <div class="number">20+</div>
+            <div class="number" data-count="20" data-suffix="+">20+</div>
             <div class="label">Projects</div>
           </div>
           <div class="stat-card">
-            <div class="number">1M+</div>
+            <div class="number" data-count="1" data-suffix="M+">1M+</div>
             <div class="label">Lines of Code</div>
           </div>
         </div>
@@ -897,5 +1321,129 @@ layout: null
       <p class="footer-text">Designed & Built by Jingwen Ou</p>
     </div>
   </footer>
+  <script>
+    (function () {
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var nav = document.querySelector('nav');
+      var progress = document.querySelector('.scroll-progress');
+      var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-links a'));
+      var sections = navLinks.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+
+      // Nav state, scroll progress, active section
+      var ticking = false;
+      function onScroll() {
+        var y = window.scrollY;
+        var max = document.documentElement.scrollHeight - window.innerHeight;
+        nav.classList.toggle('scrolled', y > 20);
+        progress.style.transform = 'scaleX(' + (max > 0 ? y / max : 0) + ')';
+        var current = -1;
+        sections.forEach(function (sec, i) {
+          if (sec && sec.getBoundingClientRect().top <= window.innerHeight * 0.4) current = i;
+        });
+        navLinks.forEach(function (a, i) { a.classList.toggle('active', i === current); });
+        ticking = false;
+      }
+      window.addEventListener('scroll', function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
+      }, { passive: true });
+      onScroll();
+
+      // Count-up numbers
+      function countUp(el) {
+        var target = parseFloat(el.getAttribute('data-count'));
+        var suffix = el.getAttribute('data-suffix') || '';
+        if (reduceMotion) { el.textContent = target + suffix; return; }
+        var start = null, duration = 1600;
+        function step(ts) {
+          if (start === null) start = ts;
+          var t = Math.min((ts - start) / duration, 1);
+          var eased = 1 - Math.pow(1 - t, 3);
+          el.textContent = Math.round(target * eased) + suffix;
+          if (t < 1) requestAnimationFrame(step);
+        }
+        el.textContent = '0' + suffix;
+        requestAnimationFrame(step);
+      }
+
+      // Scroll reveal with stagger among siblings
+      var revealTargets = document.querySelectorAll(
+        'section:not(.hero) .section-label, section:not(.hero) .section-title, .section-desc, .about-text, ' +
+        '.stat-card, .skill-card, .project-card, .contact-title, .contact-desc, .contact-links'
+      );
+      var counters = document.querySelectorAll('[data-count]');
+
+      if (!('IntersectionObserver' in window)) {
+        document.documentElement.classList.remove('js');
+        return;
+      }
+
+      Array.prototype.forEach.call(revealTargets, function (el) {
+        el.classList.add('reveal');
+        if (el.matches('.stat-card, .skill-card, .project-card')) {
+          var idx = Array.prototype.indexOf.call(el.parentNode.children, el);
+          el.style.setProperty('--reveal-delay', (idx * 0.1) + 's');
+          el.addEventListener('transitionend', function handler(e) {
+            if (e.propertyName === 'opacity' && el.classList.contains('in-view')) {
+              el.classList.add('settled');
+              el.removeEventListener('transitionend', handler);
+            }
+          });
+        }
+      });
+
+      var revealObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+      Array.prototype.forEach.call(revealTargets, function (el) { revealObserver.observe(el); });
+
+      var countObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            countUp(entry.target);
+            countObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.6 });
+      Array.prototype.forEach.call(counters, function (el) { countObserver.observe(el); });
+
+      if (reduceMotion) return;
+
+      // Hero card parallax following the pointer
+      var hero = document.querySelector('.hero');
+      var cards = document.querySelectorAll('.visual-card');
+      var depth = [18, 30, 12];
+      if (window.matchMedia('(hover: hover)').matches) {
+        hero.addEventListener('mousemove', function (e) {
+          var r = hero.getBoundingClientRect();
+          var dx = (e.clientX - r.left) / r.width - 0.5;
+          var dy = (e.clientY - r.top) / r.height - 0.5;
+          Array.prototype.forEach.call(cards, function (c, i) {
+            c.style.setProperty('--px', (-dx * depth[i]) + 'px');
+            c.style.setProperty('--py', (-dy * depth[i]) + 'px');
+          });
+        });
+        hero.addEventListener('mouseleave', function () {
+          Array.prototype.forEach.call(cards, function (c) {
+            c.style.setProperty('--px', '0px');
+            c.style.setProperty('--py', '0px');
+          });
+        });
+      }
+
+      // Spotlight that follows the cursor inside skill cards
+      Array.prototype.forEach.call(document.querySelectorAll('.skill-card'), function (card) {
+        card.addEventListener('mousemove', function (e) {
+          var r = card.getBoundingClientRect();
+          card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+          card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

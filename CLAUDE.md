@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 This is a personal GitHub Pages portfolio site for Jingwen Ou (oujingwen.github.io) built with Jekyll. The repository contains:
-- A dark-themed single-page portfolio (`index.html`)
+- A light-themed, animated single-page portfolio (`index.html`)
 - An 8-dimensional hypercube (octeract) projection visualization (`8d-hypercube.html`)
 - A standalone Super Mario-style browser game (`gemini3-demo.html`, also served at `/gemini3-demo/`)
 - Legacy React files (`app.js`, `index.js`, `package-lock.json`) from a previous iteration
@@ -28,7 +28,7 @@ Changes pushed to the `gh-pages` branch are automatically deployed to GitHub Pag
 
 ### Main Landing Page (`index.html`)
 A single-page portfolio with Jekyll front matter (`layout: null`) and inline styles:
-- Dark theme with an orange accent, defined as CSS custom properties on `:root` (`--accent: #f97316`, etc.)
+- Light theme with an orange accent, defined as CSS custom properties on `:root` (`--accent: #ea580c` for decoration, `--accent-strong: #c2410c` for small text and buttons to keep contrast on light backgrounds)
 - Google Fonts: Instrument Serif, DM Sans, JetBrains Mono
 - Fixed nav with "JO" logo and anchor links (About, Skills, Projects, Contact)
 - Hero section with headline, CTA buttons, and visual cards linking to the 8D and game projects plus a "5+ Years" stat
@@ -39,6 +39,13 @@ A single-page portfolio with Jekyll front matter (`layout: null`) and inline sty
 - Responsive breakpoints at 1024px, 768px, and 480px
 
 Jekyll Liquid is used only in `<head>`: `{{ site.title }}` and `{{ site.description }}`.
+
+Animations:
+- CSS keyframes: nav slide-in, word-by-word hero title reveal, shimmering gradient on the title `<em>`, drifting background blobs, floating hero cards, shifting gradients on project images, breathing glow in the contact section
+- Hover effects: underline on nav links, sheen on the primary button, lift and shadow on cards, cursor-following spotlight on skill cards
+- An inline script at the end of `<body>` handles: scroll progress bar, nav background and active link on scroll, scroll-reveal with staggered cards (`.reveal` / `.in-view` / `.settled` classes, added by JS), count-up numbers (`data-count` / `data-suffix`), and pointer parallax on hero cards
+- A script in `<head>` adds the `js` class to `<html>`; reveal styles only hide content under `.js`, so the page stays visible without JavaScript
+- `prefers-reduced-motion: reduce` disables animations and transitions
 
 ### 8D Hypercube Visualization (`8d-hypercube.html`)
 A standalone page (no front matter) with its UI written in Traditional Chinese (`lang="zh-TW"`):
@@ -121,4 +128,4 @@ To update portfolio sections in `index.html`:
 - **Skills**: Edit the `skill-card` divs in the `#skills` section
 - **Projects**: Add or edit `project-card` links in the `#projects` section; when adding a new project page, consider also linking it from the hero `visual-card` elements
 - **Contact Links**: Update the `contact-links` section (currently only GitHub)
-- **Stats**: Update the `stat-card` numbers in the about section and the "5+" stat in the hero `card-3`
+- **Stats**: Update the `stat-card` numbers in the about section and the "5+" stat in the hero `card-3`; keep each element's `data-count` and `data-suffix` attributes in sync with its text, since the count-up animation renders from them
