@@ -72,11 +72,13 @@ A standalone page (no front matter, `lang="zh-TW"`) rendering a low-poly tree wi
 - `prefers-reduced-motion: reduce` disables auto-rotate, wind and the growth animation
 
 ### Tree Module (`tree.js`)
-A standalone ES module that only depends on `three` (bare import, for bundlers or an import map). It is not loaded by any page; `tree-3d.html` has its own inline copy of the generation code.
-- `createTree(options)` returns a `THREE.Group` named `Tree` with a merged `Bark` mesh and a `Leaves` InstancedMesh (or a single vertex-colored Mesh with `instancedLeaves: false`, for exporting); no renderer, scene or DOM
-- Options and defaults are in `DEFAULT_TREE_OPTIONS`; season palettes are exported as `SEASONS`
-- Deterministic for a given integer `seed`; depth is clamped so branch segments stay within `maxSegments`
+A plain script (no `import`/`export`) that builds a procedural tree with the global `THREE`. It is not loaded by any page; `tree-3d.html` has its own inline copy of the generation code.
+- Keep it free of ES module syntax: it is meant to be pasted into three.js viewers/sandboxes that run code as a classic script with `THREE`, `canvas`, `width`, `height` (and optionally `OrbitControls`) provided as globals
+- The library is an IIFE assigned to `var TreeGenerator`; it takes `THREE` from the global scope, or `require('three')` under CommonJS, and also sets `window.TreeGenerator` / `module.exports`
+- `TreeGenerator.createTree(options)` returns a `THREE.Group` named `Tree` with a merged `Bark` mesh and a `Leaves` InstancedMesh (or a single vertex-colored Mesh with `instancedLeaves: false`, for exporting)
+- Options and defaults are in `DEFAULT_TREE_OPTIONS`; season palettes are in `SEASONS`; deterministic for a given integer `seed`; depth is clamped so branch segments stay within `maxSegments`
 - `group.userData` holds `seed`, `depth`, `branchCount`, `leafCount`, the resolved `options` and `dispose()`
+- The demo block at the end only runs when a `canvas` global exists; it sets up renderer, lights, ground and an auto-rotating camera
 
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
 A standalone Super Mario-style platformer written in vanilla JavaScript:
@@ -107,7 +109,7 @@ These files are not integrated with the current Jekyll site.
 ├── index.html               # Main portfolio page (Jekyll + HTML/CSS)
 ├── 8d-hypercube.html        # 8D hypercube projection visualization
 ├── tree-3d.html             # Procedural 3D tree (three.js)
-├── tree.js                  # Standalone three.js tree module (createTree)
+├── tree.js                  # Standalone three.js tree script (TreeGenerator.createTree)
 ├── gemini3-demo.html        # Standalone game demo
 ├── gemini3-demo/
 │   └── index.html           # Copy of the game for the /gemini3-demo route
