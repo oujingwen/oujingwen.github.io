@@ -9,6 +9,7 @@ This is a personal GitHub Pages portfolio site for Jingwen Ou (oujingwen.github.
 - An 8-dimensional hypercube (octeract) projection visualization (`8d-hypercube.html`)
 - A standalone Super Mario-style browser game (`gemini3-demo.html`, also served at `/gemini3-demo/`)
 - A procedural 3D tree built with three.js (`tree-3d.html`)
+- A standalone three.js tree module (`tree.js`), not used by any page
 - Legacy React files (`app.js`, `index.js`, `package-lock.json`) from a previous iteration
 
 ## Deployment
@@ -70,6 +71,13 @@ A standalone page (no front matter, `lang="zh-TW"`) rendering a low-poly tree wi
 - Page chrome shares the homepage's visual style (tokens, fonts, noise overlay, background blobs, nav with a link back to the portfolio); responsive breakpoints at 960px and 480px
 - `prefers-reduced-motion: reduce` disables auto-rotate, wind and the growth animation
 
+### Tree Module (`tree.js`)
+A standalone ES module that only depends on `three` (bare import, for bundlers or an import map). It is not loaded by any page; `tree-3d.html` has its own inline copy of the generation code.
+- `createTree(options)` returns a `THREE.Group` named `Tree` with a merged `Bark` mesh and a `Leaves` InstancedMesh (or a single vertex-colored Mesh with `instancedLeaves: false`, for exporting); no renderer, scene or DOM
+- Options and defaults are in `DEFAULT_TREE_OPTIONS`; season palettes are exported as `SEASONS`
+- Deterministic for a given integer `seed`; depth is clamped so branch segments stay within `maxSegments`
+- `group.userData` holds `seed`, `depth`, `branchCount`, `leafCount`, the resolved `options` and `dispose()`
+
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
 A standalone Super Mario-style platformer written in vanilla JavaScript:
 - Canvas-based 2D game with a custom physics engine
@@ -99,6 +107,7 @@ These files are not integrated with the current Jekyll site.
 ├── index.html               # Main portfolio page (Jekyll + HTML/CSS)
 ├── 8d-hypercube.html        # 8D hypercube projection visualization
 ├── tree-3d.html             # Procedural 3D tree (three.js)
+├── tree.js                  # Standalone three.js tree module (createTree)
 ├── gemini3-demo.html        # Standalone game demo
 ├── gemini3-demo/
 │   └── index.html           # Copy of the game for the /gemini3-demo route
