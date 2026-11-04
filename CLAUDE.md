@@ -73,12 +73,11 @@ A standalone page (no front matter, `lang="zh-TW"`) rendering a low-poly tree wi
 
 ### Tree Module (`tree.js`)
 A plain script (no `import`/`export`) that builds a procedural tree with the global `THREE`. It is not loaded by any page; `tree-3d.html` has its own inline copy of the generation code.
-- Keep it free of ES module syntax: it is meant to be pasted into three.js viewers/sandboxes that run code as a classic script with `THREE`, `canvas`, `width`, `height` (and optionally `OrbitControls`) provided as globals
-- The library is an IIFE assigned to `var TreeGenerator`; it takes `THREE` from the global scope, or `require('three')` under CommonJS, and also sets `window.TreeGenerator` / `module.exports`
-- `TreeGenerator.createTree(options)` returns a `THREE.Group` named `Tree` with a merged `Bark` mesh and a `Leaves` InstancedMesh (or a single vertex-colored Mesh with `instancedLeaves: false`, for exporting)
-- Options and defaults are in `DEFAULT_TREE_OPTIONS`; season palettes are in `SEASONS`; deterministic for a given integer `seed`; depth is clamped so branch segments stay within `maxSegments`
+- Targets three environments: google/three-live (`<script type="text/three">`, which provides `THREE` and `scene`), three.js viewers that provide `THREE`/`canvas`/`width`/`height`, and plain browser/CommonJS use
+- Keep it compatible with three-live's reduced authoring runtime: no ES module syntax, and only `BufferGeometry` (`setAttribute`, `setIndex`), `BufferAttribute`, `Mesh`, `Group`, `MeshStandardMaterial`, `DirectionalLight`, `AmbientLight`; vector math is done on plain `[x, y, z]` arrays because three-live's `Vector3` lacks most helpers. three-live does not export vertex colors, so leaves are one mesh per color. Its quotas: 100,000 vertices, 300,000 indices, 1,000 meshes, 10,000 instances per `InstancedMesh`, and a short script time budget
+- `TreeGenerator.createTree(options)` returns a `THREE.Group` named `Tree` with a `Bark` mesh and a `Leaves` group (`Leaves_0`...); options and defaults are in `DEFAULT_TREE_OPTIONS`, season palettes in `SEASONS`; deterministic for a given integer `seed`; `maxSegments` / `maxLeaves` cap the size
 - `group.userData` holds `seed`, `depth`, `branchCount`, `leafCount`, the resolved `options` and `dispose()`
-- The demo block at the end only runs when a `canvas` global exists; it sets up renderer, lights, ground and an auto-rotating camera
+- Auto-run blocks at the end: when a three-live `scene` (has `toGLB`) is present and there is no `canvas`, a smaller tree and two lights are added to it; when a `canvas` global exists, a full renderer demo runs
 
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
 A standalone Super Mario-style platformer written in vanilla JavaScript:

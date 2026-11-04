@@ -2,6 +2,8 @@
  * Procedural low-poly tree for three.js.
  *
  * A plain script (no import/export) that uses the global `THREE`. It works in:
+ *   - three-live (google/three-live): paste the whole file; the tree is added to the
+ *     provided `scene` automatically
  *   - Three.js viewers / sandboxes that provide `THREE`, `canvas`, `width`, `height`
  *     (paste the whole file: the demo at the bottom renders a tree)
  *   - a browser <script> after three.js is loaded: `TreeGenerator.createTree(...)`
@@ -15,11 +17,17 @@
  *   scene.remove(tree);
  *   tree.userData.dispose();
  *
- * The returned THREE.Group contains:
- *   - "Bark":   a Mesh with all branches merged into one BufferGeometry
- *   - "Leaves": an InstancedMesh (default) or a single Mesh with vertex colors
- *               when `instancedLeaves: false` (better for exporting to glTF/OBJ).
- *               Omitted when there are no leaves (e.g. winter).
+ * Compatibility notes:
+ *   All geometry is computed by this file and stored in plain BufferGeometry objects.
+ *   It only uses BufferGeometry, BufferAttribute, Mesh, Group and MeshStandardMaterial,
+ *   so it also runs on reduced three.js implementations such as the three-live
+ *   authoring runtime, which lacks most Vector3 / geometry helper methods and does
+ *   not export vertex colors. Leaves are therefore split into one mesh per color.
+ *
+ * The returned THREE.Group ("Tree") contains:
+ *   - "Bark":   one Mesh with all branches
+ *   - "Leaves": a Group with one Mesh per leaf color ("Leaves_0", "Leaves_1", ...),
+ *               omitted when there are no leaves (e.g. winter)
  *
  * The trunk base sits at the origin, the tree grows along +Y and its total height
  * is normalized to `options.height`.
@@ -31,30 +39,58 @@ var TreeGenerator = (function (THREE) {
         throw new Error('tree.js needs three.js: load it first so that THREE is defined.');
     }
 
+    const DOUBLE_SIDE = 2; // THREE.DoubleSide; a literal so reduced runtimes don't need the constant
+
     const SEASONS = {
-        spring: { leaves: ['#f9a8d4', '#fbcfe8', '#f472b6', '#fdf2f8', '#bef264'], bark: '#6b4f3a', density: 1, leafScale: 0.85 },
-        summer: { leaves: ['#3f6212', '#4d7c0f', '#65a30d', '#84cc16', '#166534'], bark: '#5b4330', density: 1, leafScale: 1 },
-        autumn: { leaves: ['#ea580c', '#f59e0b', '#dc2626', '#c2410c', '#facc15'], bark: '#5b4330', density: 0.85, leafScale: 1 },
-        winter: { leaves: [], bark: '#7a6656', density: 0, leafScale: 1 }
+        spring: { leaves: [0xf9a8d4, 0xfbcfe8, 0xf472b6, 0xfdf2f8, 0xbef264], bark: 0x6b4f3a, density: 1, leafScale: 0.85 },
+        summer: { leaves: [0x3f6212, 0x4d7c0f, 0x65a30d, 0x84cc16, 0x166534], bark: 0x5b4330, density: 1, leafScale: 1 },
+        autumn: { leaves: [0xea580c, 0xf59e0b, 0xdc2626, 0xc2410c, 0xfacc15], bark: 0x5b4330, density: 0.85, leafScale: 1 },
+        winter: { leaves: [], bark: 0x7a6656, density: 0, leafScale: 1 }
     };
 
     const DEFAULT_TREE_OPTIONS = {
         seed: undefined,        // integer; random when undefined (the value used is in userData.seed)
-        depth: 7,               // recursion levels below the trunk
+        depth: 6,               // recursion levels below the trunk
         branches: 3,            // children per branch node (2-6)
         angle: 32,              // spread angle of side branches, in degrees
-        leavesPerTip: 10,       // leaves around each terminal branch
+        leavesPerTip: 8,        // leaves around each terminal branch
         season: 'summer',       // 'spring' | 'summer' | 'autumn' | 'winter'
         height: 7,              // total tree height in world units
         trunkRadius: 0.3,       // trunk radius before height normalization
-        maxSegments: 4000,      // branch budget; depth is reduced if it would be exceeded
-        instancedLeaves: true,  // false -> leaves baked into one Mesh with vertex colors
+        maxSegments: 2000,      // branch budget; depth is reduced if it would be exceeded
+        maxLeaves: 8000,        // leaf budget; leavesPerTip is reduced if it would be exceeded
         castShadow: true,
         receiveShadow: true
     };
 
-    const UP = new THREE.Vector3(0, 1, 0);
-    const X_AXIS = new THREE.Vector3(1, 0, 0);
+    // ---- Small vector helpers on [x, y, z] arrays (no dependency on Vector3 methods) ----
+    function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+    function mul(a, s) { return [a[0] * s, a[1] * s, a[2] * s]; }
+    function madd(a, b, s) { return [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s]; }
+    function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+    function cross(a, b) {
+        return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    }
+    function norm(a) {
+        const l = Math.sqrt(dot(a, a)) || 1;
+        return [a[0] / l, a[1] / l, a[2] / l];
+    }
+    /** Rotate v around the unit axis k by angle (Rodrigues' formula). */
+    function rotate(v, k, angle) {
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+        const kv = cross(k, v);
+        const kd = dot(k, v) * (1 - c);
+        return [
+            v[0] * c + kv[0] * s + k[0] * kd,
+            v[1] * c + kv[1] * s + k[1] * kd,
+            v[2] * c + kv[2] * s + k[2] * kd
+        ];
+    }
+    /** Unit vector perpendicular to the unit vector d. */
+    function perpendicular(d) {
+        return norm(cross(d, Math.abs(d[1]) < 0.95 ? [0, 1, 0] : [1, 0, 0]));
+    }
 
     function mulberry32(a) {
         return function () {
@@ -65,84 +101,13 @@ var TreeGenerator = (function (THREE) {
         };
     }
 
-    /** Merge indexed geometries that all have position, normal and uv attributes. */
-    function mergeIndexed(geometries) {
-        let vertexCount = 0;
-        let indexCount = 0;
-        for (const g of geometries) {
-            vertexCount += g.attributes.position.count;
-            indexCount += g.index.count;
-        }
-        const position = new Float32Array(vertexCount * 3);
-        const normal = new Float32Array(vertexCount * 3);
-        const uv = new Float32Array(vertexCount * 2);
-        const index = new Uint32Array(indexCount);
-
-        let vOffset = 0;
-        let iOffset = 0;
-        for (const g of geometries) {
-            const n = g.attributes.position.count;
-            position.set(g.attributes.position.array, vOffset * 3);
-            normal.set(g.attributes.normal.array, vOffset * 3);
-            uv.set(g.attributes.uv.array, vOffset * 2);
-            const src = g.index.array;
-            for (let i = 0; i < src.length; i++) index[iOffset + i] = src[i] + vOffset;
-            vOffset += n;
-            iOffset += src.length;
-        }
-
-        const merged = new THREE.BufferGeometry();
-        merged.setAttribute('position', new THREE.BufferAttribute(position, 3));
-        merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
-        merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-        merged.setIndex(new THREE.BufferAttribute(index, 1));
-        return merged;
-    }
-
-    function createLeafGeometry() {
-        const shape = new THREE.Shape();
-        shape.moveTo(0, 0);
-        shape.quadraticCurveTo(0.55, 0.45, 0, 1.2);
-        shape.quadraticCurveTo(-0.55, 0.45, 0, 0);
-        return new THREE.ShapeGeometry(shape, 3);
-    }
-
-    /** Bake per-instance transforms and colors into one geometry with a color attribute. */
-    function bakeInstances(baseGeometry, matrices, colors) {
-        const pos = baseGeometry.attributes.position;
-        const nor = baseGeometry.attributes.normal;
-        const idx = baseGeometry.index;
-        const n = matrices.length;
-        const vc = pos.count;
-        const ic = idx.count;
-        const P = new Float32Array(n * vc * 3);
-        const N = new Float32Array(n * vc * 3);
-        const C = new Float32Array(n * vc * 3);
-        const I = new Uint32Array(n * ic);
-        const nm = new THREE.Matrix3();
-        const v = new THREE.Vector3();
-
-        for (let i = 0; i < n; i++) {
-            const m = matrices[i];
-            const c = colors[i];
-            nm.getNormalMatrix(m);
-            for (let j = 0; j < vc; j++) {
-                const o = (i * vc + j) * 3;
-                v.fromBufferAttribute(pos, j).applyMatrix4(m);
-                P[o] = v.x; P[o + 1] = v.y; P[o + 2] = v.z;
-                v.fromBufferAttribute(nor, j).applyMatrix3(nm).normalize();
-                N[o] = v.x; N[o + 1] = v.y; N[o + 2] = v.z;
-                C[o] = c.r; C[o + 1] = c.g; C[o + 2] = c.b;
-            }
-            for (let k = 0; k < ic; k++) I[i * ic + k] = idx.getX(k) + i * vc;
-        }
-
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(P, 3));
-        g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-        g.setAttribute('color', new THREE.BufferAttribute(C, 3));
-        g.setIndex(new THREE.BufferAttribute(I, 1));
-        return g;
+    function makeGeometry(positions, normals, indices, vertexCount) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        const IndexArray = vertexCount > 65535 ? Uint32Array : Uint16Array;
+        geometry.setIndex(new THREE.BufferAttribute(indices instanceof IndexArray ? indices : new IndexArray(indices), 1));
+        return geometry;
     }
 
     /**
@@ -150,37 +115,36 @@ var TreeGenerator = (function (THREE) {
      * @param {Partial<typeof DEFAULT_TREE_OPTIONS>} options
      * @returns {THREE.Group} group with userData { seed, depth, branchCount, leafCount, options, dispose }
      */
-    function createTree(options = {}) {
-        const o = { ...DEFAULT_TREE_OPTIONS, ...options };
+    function createTree(options) {
+        const o = Object.assign({}, DEFAULT_TREE_OPTIONS, options || {});
         const palette = SEASONS[o.season];
         if (!palette) {
             throw new Error('Unknown season "' + o.season + '". Use one of: ' + Object.keys(SEASONS).join(', '));
         }
 
-        const branches = THREE.MathUtils.clamp(Math.round(o.branches), 2, 6);
-        const maxDepth = Math.floor(Math.log(o.maxSegments) / Math.log(branches));
-        const depth = THREE.MathUtils.clamp(Math.round(o.depth), 1, maxDepth);
+        const branches = Math.min(6, Math.max(2, Math.round(o.branches)));
+        const maxDepth = Math.max(1, Math.floor(Math.log(o.maxSegments) / Math.log(branches)));
+        const depth = Math.min(maxDepth, Math.max(1, Math.round(o.depth)));
         const seed = Number.isInteger(o.seed) ? o.seed : Math.floor(Math.random() * 1e9);
         const rand = mulberry32(seed);
-        const spread = THREE.MathUtils.degToRad(o.angle);
+        const spread = o.angle * Math.PI / 180;
 
         // ---- Branch skeleton ----
         const segments = [];   // { start, dir, len, r0, r1 }
         const tips = [];       // { pos, dir, len }
 
         function grow(start, dir, len, radius, level) {
-            const end = start.clone().addScaledVector(dir, len);
+            const end = madd(start, dir, len);
             const childRadius = radius * 0.68;
-            segments.push({ start, dir, len, r0: radius, r1: level === 0 ? radius * 0.45 : childRadius });
+            segments.push({ start: start, dir: dir, len: len, r0: radius, r1: level === 0 ? radius * 0.45 : childRadius });
 
             if (level === 0) {
-                tips.push({ pos: end, dir, len });
+                tips.push({ pos: end, dir: dir, len: len });
                 return;
             }
 
             const azimuth0 = rand() * Math.PI * 2;
-            const ref = Math.abs(dir.y) < 0.95 ? UP : X_AXIS;
-            const perp = new THREE.Vector3().crossVectors(dir, ref).normalize();
+            const perp = perpendicular(dir);
 
             for (let i = 0; i < branches; i++) {
                 // The first child continues the leader with a small bend; the others spread out.
@@ -189,55 +153,83 @@ var TreeGenerator = (function (THREE) {
                     ? spread * (0.15 + rand() * 0.25)
                     : spread * (0.75 + rand() * 0.5);
                 const azimuth = azimuth0 + (i / branches) * Math.PI * 2 + (rand() - 0.5) * 0.8;
-                const axis = perp.clone().applyAxisAngle(dir, azimuth);
-                const newDir = dir.clone().applyAxisAngle(axis, bend);
-                newDir.y += 0.12 + (1 - level / depth) * 0.08;   // upward tropism
-                newDir.normalize();
+                const axis = rotate(perp, dir, azimuth);
+                let newDir = rotate(dir, axis, bend);
+                newDir[1] += 0.12 + (1 - level / depth) * 0.08;   // upward tropism
+                newDir = norm(newDir);
 
                 const lenScale = (isLeader ? 0.78 : 0.68) + (rand() - 0.5) * 0.14;
-                const startAt = isLeader ? end : start.clone().lerp(end, 0.82 + rand() * 0.18);
+                const startAt = isLeader ? end : madd(start, dir, len * (0.82 + rand() * 0.18));
                 grow(startAt, newDir, len * lenScale, isLeader ? childRadius : childRadius * 0.9, level - 1);
             }
         }
 
-        const trunkDir = new THREE.Vector3((rand() - 0.5) * 0.12, 1, (rand() - 0.5) * 0.12).normalize();
-        grow(new THREE.Vector3(0, 0, 0), trunkDir, 2.0 + rand() * 0.4, o.trunkRadius, depth);
+        const trunkDir = norm([(rand() - 0.5) * 0.12, 1, (rand() - 0.5) * 0.12]);
+        grow([0, 0, 0], trunkDir, 2.0 + rand() * 0.4, o.trunkRadius, depth);
 
         // ---- Height normalization ----
         let rawHeight = 0;
-        for (const s of segments) rawHeight = Math.max(rawHeight, s.start.y + s.dir.y * s.len);
-        for (const t of tips) rawHeight = Math.max(rawHeight, t.pos.y + t.len * 0.5);
+        for (const s of segments) rawHeight = Math.max(rawHeight, s.start[1] + s.dir[1] * s.len);
+        for (const t of tips) rawHeight = Math.max(rawHeight, t.pos[1] + t.len * 0.5);
         const scale = o.height / rawHeight;
 
-        // ---- Bark geometry ----
-        const m = new THREE.Matrix4();
-        const q = new THREE.Quaternion();
-        const one = new THREE.Vector3(1, 1, 1);
-        const parts = [];
-        for (const s of segments) {
-            const radial = s.r0 > 0.12 ? 8 : s.r0 > 0.04 ? 6 : 4;
-            // Extend each segment slightly backwards so joints overlap without gaps.
-            const overlap = Math.min(s.r0 * 1.2, s.len * 0.3);
-            const g = new THREE.CylinderGeometry(s.r1, s.r0, s.len + overlap, radial, 1, true);
-            g.translate(0, (s.len + overlap) / 2 - overlap, 0);
-            q.setFromUnitVectors(UP, s.dir);
-            m.compose(s.start, q, one);
-            g.applyMatrix4(m);
-            parts.push(g);
+        // ---- Bark: one tapered, open-ended cylinder per segment ----
+        const flare = { start: [0, 0, 0], dir: [0, 1, 0], len: 0.35, r0: o.trunkRadius * 1.6, r1: o.trunkRadius, flare: true };
+        const tubes = segments.concat([flare]);
+        let barkVerts = 0;
+        let barkIdx = 0;
+        for (const s of tubes) {
+            s.radial = s.flare ? 8 : s.r0 > 0.12 ? 7 : s.r0 > 0.04 ? 5 : 3;
+            barkVerts += s.radial * 2;
+            barkIdx += s.radial * 6;
         }
-        const flare = new THREE.CylinderGeometry(o.trunkRadius, o.trunkRadius * 1.6, 0.35, 8, 1, true);
-        flare.translate(0, 0.175, 0);
-        parts.push(flare);
+        const bp = new Float32Array(barkVerts * 3);
+        const bn = new Float32Array(barkVerts * 3);
+        const bi = new (barkVerts > 65535 ? Uint32Array : Uint16Array)(barkIdx);
+        let vOff = 0;
+        let iOff = 0;
 
-        const barkGeometry = mergeIndexed(parts);
-        parts.forEach((g) => g.dispose());
-        barkGeometry.scale(scale, scale, scale);
-        barkGeometry.computeBoundingBox();
-        barkGeometry.computeBoundingSphere();
+        for (const s of tubes) {
+            const d = s.dir;
+            const u = perpendicular(d);
+            const w = cross(d, u);
+            // Extend each segment slightly backwards so joints overlap without gaps.
+            const overlap = s.flare ? 0 : Math.min(s.r0 * 1.2, s.len * 0.3);
+            const base = madd(s.start, d, -overlap);
+            const top = madd(s.start, d, s.len);
+            const slope = (s.r0 - s.r1) / (s.len + overlap);
+            const n = s.radial;
 
+            for (let k = 0; k < n; k++) {
+                const a = (k / n) * Math.PI * 2;
+                const ring = add(mul(u, Math.cos(a)), mul(w, Math.sin(a)));
+                const normal = norm(madd(ring, d, slope));
+                const pb = madd(base, ring, s.r0);
+                const pt = madd(top, ring, s.r1);
+                const ob = (vOff + k) * 3;
+                const ot = (vOff + n + k) * 3;
+                bp[ob] = pb[0] * scale; bp[ob + 1] = pb[1] * scale; bp[ob + 2] = pb[2] * scale;
+                bp[ot] = pt[0] * scale; bp[ot + 1] = pt[1] * scale; bp[ot + 2] = pt[2] * scale;
+                bn[ob] = bn[ot] = normal[0];
+                bn[ob + 1] = bn[ot + 1] = normal[1];
+                bn[ob + 2] = bn[ot + 2] = normal[2];
+
+                // Quad (bottom k, bottom k+1, top k+1, top k), counter-clockwise from outside
+                const b0 = vOff + k;
+                const b1 = vOff + (k + 1) % n;
+                const t0 = vOff + n + k;
+                const t1 = vOff + n + (k + 1) % n;
+                bi[iOff++] = b0; bi[iOff++] = b1; bi[iOff++] = t1;
+                bi[iOff++] = b0; bi[iOff++] = t1; bi[iOff++] = t0;
+            }
+            vOff += n * 2;
+        }
+
+        const barkGeometry = makeGeometry(bp, bn, bi, barkVerts);
         const barkMaterial = new THREE.MeshStandardMaterial({
             color: palette.bark,
             roughness: 0.95,
+            metalness: 0,
             flatShading: true
         });
         const bark = new THREE.Mesh(barkGeometry, barkMaterial);
@@ -249,94 +241,105 @@ var TreeGenerator = (function (THREE) {
         group.name = 'Tree';
         group.add(bark);
 
-        // ---- Leaves ----
-        const perTip = Math.max(0, Math.round(o.leavesPerTip * palette.density));
+        // ---- Leaves: flat diamonds, one mesh per palette color ----
+        let perTip = Math.max(0, Math.round(o.leavesPerTip * palette.density));
+        if (tips.length * perTip > o.maxLeaves) perTip = Math.floor(o.maxLeaves / tips.length);
         const leafCount = palette.leaves.length ? tips.length * perTip : 0;
-        let leafGeometry = null;
-        let leafMaterial = null;
+        const geometries = [barkGeometry];
+        const materials = [barkMaterial];
 
         if (leafCount > 0) {
-            const swatches = palette.leaves.map((c) => new THREE.Color(c));
-            const matrices = new Array(leafCount);
-            const colors = new Array(leafCount);
-            const pos = new THREE.Vector3();
-            const scl = new THREE.Vector3();
-            const euler = new THREE.Euler();
-            let idx = 0;
+            const colorCount = palette.leaves.length;
+            const buckets = [];
+            for (let c = 0; c < colorCount; c++) buckets.push({ p: [], n: [], count: 0 });
+            const sizeUnit = o.height / 7;
 
             for (const t of tips) {
                 const radius = Math.max(t.len * 0.9, 0.18);
                 for (let i = 0; i < perTip; i++) {
                     // Random point in a sphere around the tip, pulled back along the branch.
-                    const u = rand() * 2 - 1;
+                    const uu = rand() * 2 - 1;
                     const th = rand() * Math.PI * 2;
                     const r = radius * Math.cbrt(rand());
-                    const sq = Math.sqrt(1 - u * u);
-                    pos.set(sq * Math.cos(th), u, sq * Math.sin(th)).multiplyScalar(r);
-                    pos.addScaledVector(t.dir, -t.len * 0.3 * rand());
-                    pos.add(t.pos).multiplyScalar(scale);
+                    const sq = Math.sqrt(1 - uu * uu);
+                    let c = madd(t.pos, [sq * Math.cos(th), uu, sq * Math.sin(th)], r);
+                    c = mul(madd(c, t.dir, -t.len * 0.3 * rand()), scale);
 
-                    euler.set(rand() * Math.PI * 2, rand() * Math.PI * 2, rand() * Math.PI * 2);
-                    q.setFromEuler(euler);
-                    const s = (0.16 + rand() * 0.12) * palette.leafScale;
-                    scl.set(s, s, s);
-                    matrices[idx] = new THREE.Matrix4().compose(pos, q, scl);
+                    // Random orientation: normal n, leaf axis ax, side axis sd
+                    const n = norm([rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1]);
+                    const ax = perpendicular(n);
+                    const rotAx = rotate(ax, n, rand() * Math.PI * 2);
+                    const sd = cross(n, rotAx);
+                    const size = (0.2 + rand() * 0.14) * palette.leafScale * sizeUnit;
+                    const L = size * 1.2;
+                    const W = size * 0.42;
 
-                    const c = swatches[Math.floor(rand() * swatches.length)].clone();
-                    c.offsetHSL(0, 0, (rand() - 0.5) * 0.08);
-                    colors[idx] = c;
-                    idx++;
+                    const stem = c;
+                    const tip = madd(c, rotAx, L);
+                    const mid = madd(c, rotAx, L * 0.45);
+                    const left = madd(mid, sd, W);
+                    const right = madd(mid, sd, -W);
+
+                    const bucket = buckets[Math.floor(rand() * colorCount)];
+                    bucket.p.push(
+                        stem[0], stem[1], stem[2],
+                        left[0], left[1], left[2],
+                        tip[0], tip[1], tip[2],
+                        right[0], right[1], right[2]
+                    );
+                    for (let k = 0; k < 4; k++) bucket.n.push(n[0], n[1], n[2]);
+                    bucket.count++;
                 }
             }
 
-            const baseLeaf = createLeafGeometry();
-            let leaves;
-            if (o.instancedLeaves) {
-                leafGeometry = baseLeaf;
-                leafMaterial = new THREE.MeshStandardMaterial({ roughness: 0.75, side: THREE.DoubleSide, flatShading: true });
-                leaves = new THREE.InstancedMesh(leafGeometry, leafMaterial, leafCount);
-                for (let i = 0; i < leafCount; i++) {
-                    leaves.setMatrixAt(i, matrices[i]);
-                    leaves.setColorAt(i, colors[i]);
+            const leavesGroup = new THREE.Group();
+            leavesGroup.name = 'Leaves';
+            for (let ci = 0; ci < colorCount; ci++) {
+                const b = buckets[ci];
+                if (b.count === 0) continue;
+                const verts = b.count * 4;
+                const idx = new (verts > 65535 ? Uint32Array : Uint16Array)(b.count * 6);
+                for (let l = 0; l < b.count; l++) {
+                    const v0 = l * 4;
+                    const o6 = l * 6;
+                    idx[o6] = v0; idx[o6 + 1] = v0 + 1; idx[o6 + 2] = v0 + 2;
+                    idx[o6 + 3] = v0; idx[o6 + 4] = v0 + 2; idx[o6 + 5] = v0 + 3;
                 }
-                leaves.instanceMatrix.needsUpdate = true;
-                leaves.instanceColor.needsUpdate = true;
-                leaves.computeBoundingBox();
-                leaves.computeBoundingSphere();
-            } else {
-                leafGeometry = bakeInstances(baseLeaf, matrices, colors);
-                baseLeaf.dispose();
-                leafGeometry.computeBoundingBox();
-                leafGeometry.computeBoundingSphere();
-                leafMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, side: THREE.DoubleSide, flatShading: true });
-                leaves = new THREE.Mesh(leafGeometry, leafMaterial);
+                const geometry = makeGeometry(new Float32Array(b.p), new Float32Array(b.n), idx, verts);
+                const material = new THREE.MeshStandardMaterial({
+                    color: palette.leaves[ci],
+                    roughness: 0.75,
+                    metalness: 0,
+                    side: DOUBLE_SIDE,
+                    flatShading: true
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.name = 'Leaves_' + ci;
+                mesh.castShadow = o.castShadow;
+                mesh.receiveShadow = o.receiveShadow;
+                leavesGroup.add(mesh);
+                geometries.push(geometry);
+                materials.push(material);
             }
-            leaves.name = 'Leaves';
-            leaves.castShadow = o.castShadow;
-            leaves.receiveShadow = o.receiveShadow;
-            group.add(leaves);
+            group.add(leavesGroup);
         }
 
         group.userData = {
-            seed,
-            depth,
+            seed: seed,
+            depth: depth,
             branchCount: segments.length,
-            leafCount,
-            options: { ...o, seed, depth, branches },
-            dispose() {
-                barkGeometry.dispose();
-                barkMaterial.dispose();
-                if (leafGeometry) leafGeometry.dispose();
-                if (leafMaterial) leafMaterial.dispose();
-                const leaves = group.getObjectByName('Leaves');
-                if (leaves && leaves.isInstancedMesh) leaves.dispose();
+            leafCount: leafCount,
+            options: Object.assign({}, o, { seed: seed, depth: depth, branches: branches, leavesPerTip: perTip }),
+            dispose: function () {
+                for (const g of geometries) if (typeof g.dispose === 'function') g.dispose();
+                for (const m of materials) if (typeof m.dispose === 'function') m.dispose();
             }
         };
 
         return group;
     }
 
-    return { createTree, SEASONS, DEFAULT_TREE_OPTIONS };
+    return { createTree: createTree, SEASONS: SEASONS, DEFAULT_TREE_OPTIONS: DEFAULT_TREE_OPTIONS };
 })(
     typeof THREE !== 'undefined' ? THREE
         : typeof require === 'function' ? require('three')
@@ -351,6 +354,24 @@ if (typeof window !== 'undefined') {
 }
 
 // ---------------------------------------------------------------------------
+// three-live (google/three-live): `scene` is provided and has toGLB().
+// Add the tree and two lights to it; three-live handles camera and rendering.
+// ---------------------------------------------------------------------------
+if (typeof canvas === 'undefined' && typeof scene !== 'undefined' && scene &&
+    typeof scene.add === 'function' && typeof scene.toGLB === 'function') {
+    (function () {
+        // Kept small: three-live runs scripts in an interpreter with a short time budget.
+        const tree = TreeGenerator.createTree({ seed: 42, season: 'summer', height: 3, depth: 5, leavesPerTip: 8 });
+        scene.add(tree);
+
+        const sun = new THREE.DirectionalLight(0xfff1dc, 2.0);
+        sun.position.set(3, 6, 4);
+        scene.add(sun);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    })();
+}
+
+// ---------------------------------------------------------------------------
 // Demo: runs only in viewers that provide a `canvas` global (with width/height).
 // ---------------------------------------------------------------------------
 if (typeof canvas !== 'undefined' && typeof THREE !== 'undefined') {
@@ -358,25 +379,25 @@ if (typeof canvas !== 'undefined' && typeof THREE !== 'undefined') {
         const w = typeof width !== 'undefined' ? width : canvas.clientWidth || 800;
         const h = typeof height !== 'undefined' ? height : canvas.clientHeight || 450;
 
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
         renderer.setSize(w, h, false);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.setClearColor(0x000000, 0);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        const scene = new THREE.Scene();
+        const scene3d = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
         camera.position.set(10, 6, 12).setLength(Math.max(17, 17 * 1.2 / (w / h)));
 
-        scene.add(new THREE.HemisphereLight(0xfff7ed, 0xd6cfc4, 1.6));
+        scene3d.add(new THREE.HemisphereLight(0xfff7ed, 0xd6cfc4, 1.6));
         const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
         sun.position.set(7, 14, 6);
         sun.castShadow = true;
         sun.shadow.mapSize.set(2048, 2048);
         Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 12, bottom: -6, near: 1, far: 40 });
         sun.shadow.normalBias = 0.02;
-        scene.add(sun);
+        scene3d.add(sun);
 
         const ground = new THREE.Mesh(
             new THREE.CircleGeometry(5, 48),
@@ -384,10 +405,10 @@ if (typeof canvas !== 'undefined' && typeof THREE !== 'undefined') {
         );
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
-        scene.add(ground);
+        scene3d.add(ground);
 
         const tree = TreeGenerator.createTree({ seed: 42, season: 'summer' });
-        scene.add(tree);
+        scene3d.add(tree);
 
         const target = new THREE.Vector3(0, 3.6, 0);
         let controls = null;
@@ -405,7 +426,7 @@ if (typeof canvas !== 'undefined' && typeof THREE !== 'undefined') {
             requestAnimationFrame(animate);
             if (controls) controls.update();
             else tree.rotation.y += 0.004;
-            renderer.render(scene, camera);
+            renderer.render(scene3d, camera);
         }
         animate();
     })();
