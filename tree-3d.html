@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 程序生成樹</title>
+    <meta name="description" content="以 three.js 程序生成的 3D 樹木模型，可調整分枝、季節與風力。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #fbfaf8;
+            --bg-secondary: #f4f2ee;
+            --bg-card: #ffffff;
+            --text-primary: #18181b;
+            --text-secondary: #52525b;
+            --text-muted: #6b6b73;
+            --accent: #ea580c;
+            --accent-strong: #c2410c;
+            --accent-soft: rgba(234, 88, 12, 0.08);
+            --pink: #ec4899;
+            --violet: #8b5cf6;
+            --border: rgba(24, 24, 27, 0.08);
+            --border-strong: rgba(24, 24, 27, 0.14);
+            --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04), 0 4px 12px rgba(24, 24, 27, 0.04);
+            --shadow-lg: 0 24px 48px rgba(24, 24, 27, 0.12);
+            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+            --font-serif: 'Instrument Serif', 'Noto Serif TC', Georgia, serif;
+            --font-sans: 'DM Sans', 'Noto Sans TC', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --nav-h: 80px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.035;
+            z-index: 1000;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            height: var(--nav-h);
+            display: flex;
+            align-items: center;
+            animation: slideDown 0.8s var(--ease-out) both;
+        }
+
+        .nav-inner {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 clamp(16px, 5vw, 80px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: 'Instrument Serif', Georgia, serif;
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            letter-spacing: -0.02em;
+            display: inline-block;
+            transition: transform 0.4s var(--ease-out), color 0.3s ease;
+        }
+
+        .logo:hover { color: var(--accent); transform: rotate(-6deg) scale(1.08); }
+
+        .back-link {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s ease;
+        }
+
+        .back-link .arrow { display: inline-block; transition: transform 0.3s var(--ease-out); }
+        .back-link:hover { color: var(--text-primary); }
+        .back-link:hover .arrow { transform: translateX(-4px); }
+
+        /* Ambient Background */
+        .ambient-bg {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .ambient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(70px);
+            opacity: 0.4;
+            will-change: transform;
+        }
+
+        .orb-1 {
+            width: 520px; height: 520px;
+            top: -160px; right: -100px;
+            background: radial-gradient(circle, #fdba74 0%, transparent 70%);
+            animation: drift1 18s ease-in-out infinite alternate;
+        }
+
+        .orb-2 {
+            width: 460px; height: 460px;
+            top: 45%; left: -160px;
+            background: radial-gradient(circle, #bbf7d0 0%, transparent 70%);
+            animation: drift2 22s ease-in-out infinite alternate;
+        }
+
+        .orb-3 {
+            width: 360px; height: 360px;
+            bottom: -120px; right: 20%;
+            background: radial-gradient(circle, #f9a8d4 0%, transparent 70%);
+            opacity: 0.3;
+            animation: drift3 26s ease-in-out infinite alternate;
+        }
+
+        /* Layout */
+        .layout {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 360px;
+            gap: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--nav-h) clamp(16px, 5vw, 80px) 32px;
+            min-height: 100vh;
+        }
+
+        .stage {
+            position: relative;
+            min-height: 480px;
+            height: calc(100vh - var(--nav-h) - 32px);
+            border-radius: 24px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 100%);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            animation: fadeInUp 0.9s var(--ease-out) 0.1s both;
+        }
+
+        .stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .stage canvas:active { cursor: grabbing; }
+
+        .stage-hint {
+            position: absolute;
+            left: 20px;
+            bottom: 16px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .loading,
+        .error {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 24px;
+        }
+
+        .error { display: none; color: var(--accent-strong); }
+
+        /* Panel */
+        .panel {
+            align-self: start;
+            position: sticky;
+            top: var(--nav-h);
+            background: rgba(255, 255, 255, 0.78);
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: var(--shadow-sm);
+            padding: 24px 24px 20px;
+            animation: fadeInUp 0.9s var(--ease-out) 0.25s both;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--accent-strong);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 12px;
+        }
+
+        .badge::before {
+            content: '';
+            width: 20px;
+            height: 1px;
+            background: var(--accent);
+        }
+
+        .panel h1 {
+            font-family: var(--font-serif);
+            font-weight: 400;
+            font-size: 2.1rem;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+            margin-bottom: 10px;
+        }
+
+        .panel h1 em {
+            font-style: italic;
+            color: var(--accent);
+        }
+
+        .panel .desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .stat {
+            background: var(--bg-secondary);
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .field { margin-bottom: 12px; }
+
+        .field-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+
+        .field label,
+        .field .label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .field output {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--accent-strong);
+        }
+
+        .note {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            min-height: 1em;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--accent) var(--fill, 50%), var(--border-strong) var(--fill, 50%));
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid var(--accent);
+            box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
+            cursor: pointer;
+            transition: transform 0.2s var(--ease-out);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid var(--accent);
+            cursor: pointer;
+        }
+
+        input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.2); }
+        input[type="range"]:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+        .seasons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .season-btn {
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 8px 0;
+            border-radius: 999px;
+            border: 1px solid var(--border-strong);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s var(--ease-out);
+        }
+
+        .season-btn:hover { transform: translateY(-1px); border-color: var(--accent); color: var(--text-primary); }
+
+        .season-btn[aria-pressed="true"] {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: #fff;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .btn {
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 11px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .btn:hover { transform: translateY(-2px); }
+
+        .btn-primary {
+            background: var(--accent-strong);
+            color: #fff;
+            box-shadow: 0 6px 18px rgba(194, 65, 12, 0.25);
+        }
+
+        .btn-ghost {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-color: var(--border-strong);
+        }
+
+        .btn-ghost[aria-pressed="true"] {
+            border-color: var(--accent);
+            color: var(--accent-strong);
+            background: var(--accent-soft);
+        }
+
+        .seed {
+            margin-top: 12px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-100%); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes drift1 {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-120px, 80px) scale(1.15); }
+        }
+
+        @keyframes drift2 {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(140px, -60px) scale(1.1); }
+        }
+
+        @keyframes drift3 {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-80px, -100px) scale(1.2); }
+        }
+
+        @media (max-width: 960px) {
+            :root { --nav-h: 68px; }
+
+            .layout {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                padding-bottom: 24px;
+            }
+
+            .stage {
+                height: 62vh;
+                min-height: 360px;
+            }
+
+            .panel { position: static; }
+        }
+
+        @media (max-width: 480px) {
+            .panel { padding: 22px 18px; }
+            .panel h1 { font-size: 1.8rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <nav>
+        <div class="nav-inner">
+            <a href="./" class="logo" aria-label="Jingwen Ou 首頁">JO</a>
+            <a href="./#projects" class="back-link"><span class="arrow">&larr;</span> 回到作品集</a>
+        </div>
+    </nav>
+
+    <div class="ambient-bg" aria-hidden="true">
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
+        <div class="ambient-orb orb-3"></div>
+    </div>
+
+    <main class="layout">
+        <section class="stage" id="stage" aria-label="3D 樹木模型，可拖曳旋轉、滾輪縮放">
+            <div class="loading" id="loading">載入 three.js 中…</div>
+            <div class="error" id="error">無法載入 three.js，請確認網路連線後重新整理頁面。</div>
+            <div class="stage-hint">拖曳旋轉 · 滾輪或雙指縮放</div>
+        </section>
+
+        <aside class="panel">
+            <div class="badge">Procedural Tree</div>
+            <h1>程序生成的 <em>3D</em> 樹</h1>
+            <p class="desc">以遞迴分枝演算法即時生成樹幹與枝條，葉片使用 InstancedMesh 繪製，並以頂點著色器模擬風吹擺動。</p>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="stat-branches">0</div>
+                    <div class="stat-label">枝條數</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-leaves">0</div>
+                    <div class="stat-label">葉片數</div>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="field-head">
+                    <label for="depth">分枝層數</label>
+                    <output id="depth-out" for="depth">7</output>
+                </div>
+                <input type="range" id="depth" min="3" max="9" step="1" value="7">
+                <div class="note" id="depth-note"></div>
+            </div>
+
+            <div class="field">
+                <div class="field-head">
+                    <label for="branches">每節分枝數</label>
+                    <output id="branches-out" for="branches">3</output>
+                </div>
+                <input type="range" id="branches" min="2" max="4" step="1" value="3">
+            </div>
+
+            <div class="field">
+                <div class="field-head">
+                    <label for="angle">分枝角度</label>
+                    <output id="angle-out" for="angle">32°</output>
+                </div>
+                <input type="range" id="angle" min="10" max="60" step="1" value="32">
+            </div>
+
+            <div class="field">
+                <div class="field-head">
+                    <label for="leaves">葉片密度</label>
+                    <output id="leaves-out" for="leaves">10</output>
+                </div>
+                <input type="range" id="leaves" min="0" max="24" step="1" value="10">
+            </div>
+
+            <div class="field">
+                <div class="field-head">
+                    <label for="wind">風力</label>
+                    <output id="wind-out" for="wind">0.4</output>
+                </div>
+                <input type="range" id="wind" min="0" max="1" step="0.05" value="0.4">
+            </div>
+
+            <div class="field">
+                <div class="field-head">
+                    <span class="label" id="season-label">季節</span>
+                </div>
+                <div class="seasons" role="group" aria-labelledby="season-label">
+                    <button type="button" class="season-btn" data-season="spring" aria-pressed="false">春</button>
+                    <button type="button" class="season-btn" data-season="summer" aria-pressed="true">夏</button>
+                    <button type="button" class="season-btn" data-season="autumn" aria-pressed="false">秋</button>
+                    <button type="button" class="season-btn" data-season="winter" aria-pressed="false">冬</button>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="button" class="btn btn-primary" id="regen">重新生成</button>
+                <button type="button" class="btn btn-ghost" id="rotate" aria-pressed="true">自動旋轉</button>
+            </div>
+            <div class="seed">seed <span id="seed-value">0</span></div>
+        </aside>
+    </main>
+
+    <script>
+        // Show an error message if the module script has not started (e.g. CDN blocked).
+        setTimeout(function () {
+            if (!window.__treeReady) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'flex';
+            }
+        }, 15000);
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const stage = document.getElementById('stage');
+        const TREE_HEIGHT = 7;          // normalized tree height in world units
+        const SEGMENT_BUDGET = 4000;    // max branch segments, keeps generation fast
+
+        // ---------- Renderer / scene ----------
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        stage.prepend(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xfbfaf8, 16, 34);
+
+        const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+        camera.position.set(10, 6.5, 12);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 3.6, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.minDistance = 5;
+        controls.maxDistance = 30;
+        controls.maxPolarAngle = Math.PI / 2 - 0.04;
+        controls.autoRotate = !reduceMotion;
+        controls.autoRotateSpeed = 0.8;
+
+        scene.add(new THREE.HemisphereLight(0xfff7ed, 0xd6cfc4, 1.6));
+
+        const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
+        sun.position.set(7, 14, 6);
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048);
+        sun.shadow.camera.left = -9;
+        sun.shadow.camera.right = 9;
+        sun.shadow.camera.top = 12;
+        sun.shadow.camera.bottom = -6;
+        sun.shadow.camera.near = 1;
+        sun.shadow.camera.far = 40;
+        sun.shadow.bias = -0.0005;
+        sun.shadow.normalBias = 0.02;
+        scene.add(sun);
+
+        // Ground
+        const ground = new THREE.Mesh(
+            new THREE.CircleGeometry(60, 64),
+            new THREE.MeshStandardMaterial({ color: 0xf1ede6, roughness: 1 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const grass = new THREE.Mesh(
+            new THREE.CircleGeometry(4.2, 48),
+            new THREE.MeshStandardMaterial({ color: 0xe2e6c8, roughness: 1 })
+        );
+        grass.rotation.x = -Math.PI / 2;
+        grass.position.y = 0.005;
+        grass.receiveShadow = true;
+        scene.add(grass);
+
+        // ---------- Wind shader ----------
+        const windUniforms = {
+            uTime: { value: 0 },
+            uWind: { value: 0.4 },
+            uHeight: { value: TREE_HEIGHT }
+        };
+
+        // Sway vertices by their height (in tree-local space), so the trunk base stays fixed.
+        const windVertex = `
+            vec4 mvPosition = vec4( transformed, 1.0 );
+            #ifdef USE_INSTANCING
+                mvPosition = instanceMatrix * mvPosition;
+            #endif
+            float hN = clamp( mvPosition.y / uHeight, 0.0, 1.5 );
+            float k = hN * hN * uWind;
+            float phase = uTime * 1.6 + mvPosition.x * 0.35 + mvPosition.z * 0.25;
+            mvPosition.x += ( sin( phase ) * 0.6 + sin( uTime * 3.7 + mvPosition.y * 2.0 ) * 0.08 ) * k * uHeight * 0.06;
+            mvPosition.z += cos( phase * 0.8 ) * 0.35 * k * uHeight * 0.06;
+            mvPosition = modelViewMatrix * mvPosition;
+            gl_Position = projectionMatrix * mvPosition;
+        `;
+
+        function applyWind(material) {
+            material.onBeforeCompile = (shader) => {
+                Object.assign(shader.uniforms, windUniforms);
+                shader.vertexShader = 'uniform float uTime;\nuniform float uWind;\nuniform float uHeight;\n' +
+                    shader.vertexShader.replace('#include <project_vertex>', windVertex);
+            };
+            return material;
+        }
+
+        const barkMaterial = applyWind(new THREE.MeshStandardMaterial({
+            color: 0x6b4f3a,
+            roughness: 0.95,
+            flatShading: true
+        }));
+        const barkDepth = applyWind(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+
+        const leafMaterial = applyWind(new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.75,
+            side: THREE.DoubleSide,
+            flatShading: true
+        }));
+        const leafDepth = applyWind(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+
+        // Leaf geometry: a small pointed leaf shape with its stem at the origin.
+        const leafShape = new THREE.Shape();
+        leafShape.moveTo(0, 0);
+        leafShape.quadraticCurveTo(0.55, 0.45, 0, 1.2);
+        leafShape.quadraticCurveTo(-0.55, 0.45, 0, 0);
+        const leafGeometry = new THREE.ShapeGeometry(leafShape, 3);
+
+        // ---------- Seeded random ----------
+        function mulberry32(a) {
+            return function () {
+                a |= 0; a = a + 0x6D2B79F5 | 0;
+                let t = Math.imul(a ^ a >>> 15, 1 | a);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+
+        // ---------- Season palettes ----------
+        const SEASONS = {
+            spring: { leaves: ['#f9a8d4', '#fbcfe8', '#f472b6', '#fdf2f8', '#bef264'], bark: 0x6b4f3a, ground: 0xe4ecc8, density: 1 },
+            summer: { leaves: ['#3f6212', '#4d7c0f', '#65a30d', '#84cc16', '#166534'], bark: 0x5b4330, ground: 0xdfe6c2, density: 1 },
+            autumn: { leaves: ['#ea580c', '#f59e0b', '#dc2626', '#c2410c', '#facc15'], bark: 0x5b4330, ground: 0xefdcc4, density: 0.85 },
+            winter: { leaves: [], bark: 0x7a6656, ground: 0xf3f4f6, density: 0 }
+        };
+
+        // ---------- Tree generation ----------
+        const state = {
+            depth: 7,
+            branches: 3,
+            angle: 32,
+            leaves: 10,
+            season: 'summer',
+            seed: Math.floor(Math.random() * 1e6)
+        };
+
+        const treeGroup = new THREE.Group();
+        scene.add(treeGroup);
+        let barkMesh = null;
+        let leafMesh = null;
+        let growStart = 0;
+
+        const UP = new THREE.Vector3(0, 1, 0);
+        const X_AXIS = new THREE.Vector3(1, 0, 0);
+
+        function effectiveDepth() {
+            const maxDepth = Math.floor(Math.log(SEGMENT_BUDGET) / Math.log(state.branches));
+            return Math.min(state.depth, maxDepth);
+        }
+
+        function buildTree() {
+            const rand = mulberry32(state.seed);
+            const depth = effectiveDepth();
+            const spread = THREE.MathUtils.degToRad(state.angle);
+            const segments = [];   // { start, end, r0, r1 }
+            const tips = [];       // { pos, dir, len }
+
+            function grow(start, dir, len, radius, level) {
+                const end = start.clone().addScaledVector(dir, len);
+                const childRadius = radius * 0.68;
+                segments.push({ start, end, dir, len, r0: radius, r1: level === 0 ? radius * 0.45 : childRadius });
+
+                if (level === 0) {
+                    tips.push({ pos: end, dir, len });
+                    return;
+                }
+
+                const count = state.branches;
+                const azimuth0 = rand() * Math.PI * 2;
+                // Perpendicular axis to bend around
+                const ref = Math.abs(dir.y) < 0.95 ? UP : X_AXIS;
+                const perp = new THREE.Vector3().crossVectors(dir, ref).normalize();
+
+                for (let i = 0; i < count; i++) {
+                    // First child continues the leader with a small bend; others spread out.
+                    const isLeader = i === 0;
+                    const bend = isLeader
+                        ? spread * (0.15 + rand() * 0.25)
+                        : spread * (0.75 + rand() * 0.5);
+                    const azimuth = azimuth0 + (i / count) * Math.PI * 2 + (rand() - 0.5) * 0.8;
+                    const axis = perp.clone().applyAxisAngle(dir, azimuth);
+                    const newDir = dir.clone().applyAxisAngle(axis, bend);
+                    // Light upward tropism, stronger on thin branches.
+                    newDir.y += 0.12 + (1 - level / depth) * 0.08;
+                    newDir.normalize();
+
+                    const lenScale = (isLeader ? 0.78 : 0.68) + (rand() - 0.5) * 0.14;
+                    // Side branches start a little before the tip for a more natural silhouette.
+                    const startAt = isLeader ? end : start.clone().lerp(end, 0.82 + rand() * 0.18);
+                    grow(startAt, newDir, len * lenScale, isLeader ? childRadius : childRadius * 0.9, level - 1);
+                }
+            }
+
+            const trunkDir = new THREE.Vector3((rand() - 0.5) * 0.12, 1, (rand() - 0.5) * 0.12).normalize();
+            const trunkLen = 2.0 + rand() * 0.4;
+            grow(new THREE.Vector3(0, 0, 0), trunkDir, trunkLen, 0.3, depth);
+
+            // Build merged bark geometry
+            const geoms = [];
+            const m = new THREE.Matrix4();
+            const q = new THREE.Quaternion();
+            const one = new THREE.Vector3(1, 1, 1);
+            for (const s of segments) {
+                const radial = s.r0 > 0.12 ? 8 : s.r0 > 0.04 ? 6 : 4;
+                // Extend each segment slightly backwards so joints overlap without gaps.
+                const overlap = Math.min(s.r0 * 1.2, s.len * 0.3);
+                const g = new THREE.CylinderGeometry(s.r1, s.r0, s.len + overlap, radial, 1, true);
+                g.translate(0, (s.len + overlap) / 2 - overlap, 0);
+                q.setFromUnitVectors(UP, s.dir);
+                m.compose(s.start, q, one);
+                g.applyMatrix4(m);
+                geoms.push(g);
+            }
+            // Root flare at the base of the trunk
+            const flare = new THREE.CylinderGeometry(0.3, 0.48, 0.35, 8, 1, true);
+            flare.translate(0, 0.175, 0);
+            geoms.push(flare);
+
+            const barkGeometry = mergeGeometries(geoms, false);
+            geoms.forEach((g) => g.dispose());
+
+            // Normalize the tree height
+            barkGeometry.computeBoundingBox();
+            let maxY = barkGeometry.boundingBox.max.y;
+            for (const t of tips) maxY = Math.max(maxY, t.pos.y + t.len * 0.5);
+            const scale = TREE_HEIGHT / maxY;
+            barkGeometry.scale(scale, scale, scale);
+
+            // Leaves
+            const palette = SEASONS[state.season];
+            const perTip = Math.round(state.leaves * palette.density);
+            const leafCount = tips.length * perTip;
+            const colors = palette.leaves.map((c) => new THREE.Color(c));
+
+            // Dispose previous
+            if (barkMesh) { treeGroup.remove(barkMesh); barkMesh.geometry.dispose(); }
+            if (leafMesh) { treeGroup.remove(leafMesh); leafMesh.dispose(); }
+            barkMesh = null;
+            leafMesh = null;
+
+            barkMesh = new THREE.Mesh(barkGeometry, barkMaterial);
+            barkMesh.customDepthMaterial = barkDepth;
+            barkMesh.castShadow = true;
+            barkMesh.receiveShadow = true;
+            treeGroup.add(barkMesh);
+            barkMaterial.color.setHex(palette.bark);
+            grass.material.color.setHex(palette.ground);
+
+            if (leafCount > 0) {
+                leafMesh = new THREE.InstancedMesh(leafGeometry, leafMaterial, leafCount);
+                leafMesh.customDepthMaterial = leafDepth;
+                leafMesh.castShadow = true;
+                leafMesh.receiveShadow = true;
+
+                const pos = new THREE.Vector3();
+                const scl = new THREE.Vector3();
+                const euler = new THREE.Euler();
+                const color = new THREE.Color();
+                let idx = 0;
+                for (const t of tips) {
+                    const radius = Math.max(t.len * 0.9, 0.18);
+                    for (let i = 0; i < perTip; i++) {
+                        // Scatter leaves around the tip, biased along the branch direction
+                        const u = rand() * 2 - 1;
+                        const th = rand() * Math.PI * 2;
+                        const r = radius * Math.cbrt(rand());
+                        const sq = Math.sqrt(1 - u * u);
+                        pos.set(sq * Math.cos(th), u, sq * Math.sin(th)).multiplyScalar(r);
+                        pos.addScaledVector(t.dir, -t.len * 0.3 * rand());
+                        pos.add(t.pos).multiplyScalar(scale);
+
+                        euler.set(rand() * Math.PI * 2, rand() * Math.PI * 2, rand() * Math.PI * 2);
+                        q.setFromEuler(euler);
+                        const s = (0.16 + rand() * 0.12) * (state.season === 'spring' ? 0.85 : 1);
+                        scl.set(s, s, s);
+                        m.compose(pos, q, scl);
+                        leafMesh.setMatrixAt(idx, m);
+
+                        color.copy(colors[Math.floor(rand() * colors.length)]);
+                        color.offsetHSL(0, 0, (rand() - 0.5) * 0.08);
+                        leafMesh.setColorAt(idx, color);
+                        idx++;
+                    }
+                }
+                leafMesh.instanceMatrix.needsUpdate = true;
+                if (leafMesh.instanceColor) leafMesh.instanceColor.needsUpdate = true;
+                treeGroup.add(leafMesh);
+            }
+
+            // Stats and notes
+            document.getElementById('stat-branches').textContent = segments.length.toLocaleString();
+            document.getElementById('stat-leaves').textContent = leafCount.toLocaleString();
+            document.getElementById('seed-value').textContent = state.seed;
+            document.getElementById('depth-note').textContent = depth < state.depth
+                ? '已依效能上限調整為 ' + depth + ' 層'
+                : '';
+
+            growStart = performance.now();
+        }
+
+        // ---------- UI ----------
+        function setFill(input) {
+            const pct = (input.value - input.min) / (input.max - input.min) * 100;
+            input.style.setProperty('--fill', pct + '%');
+        }
+
+        function bindRange(id, format, onInput, rebuild) {
+            const input = document.getElementById(id);
+            const out = document.getElementById(id + '-out');
+            let timer = null;
+            const update = () => {
+                out.textContent = format(input.value);
+                setFill(input);
+                onInput(Number(input.value));
+                if (rebuild) {
+                    clearTimeout(timer);
+                    timer = setTimeout(buildTree, 120);
+                }
+            };
+            input.addEventListener('input', update);
+            out.textContent = format(input.value);
+            setFill(input);
+        }
+
+        bindRange('depth', (v) => v, (v) => { state.depth = v; }, true);
+        bindRange('branches', (v) => v, (v) => { state.branches = v; }, true);
+        bindRange('angle', (v) => v + '°', (v) => { state.angle = v; }, true);
+        bindRange('leaves', (v) => v, (v) => { state.leaves = v; }, true);
+        bindRange('wind', (v) => Number(v).toFixed(2).replace(/0$/, ''), (v) => { windUniforms.uWind.value = v; }, false);
+
+        document.querySelectorAll('.season-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.season-btn').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+                state.season = btn.dataset.season;
+                buildTree();
+            });
+        });
+
+        document.getElementById('regen').addEventListener('click', () => {
+            state.seed = Math.floor(Math.random() * 1e6);
+            buildTree();
+        });
+
+        const rotateBtn = document.getElementById('rotate');
+        rotateBtn.setAttribute('aria-pressed', String(controls.autoRotate));
+        rotateBtn.addEventListener('click', () => {
+            controls.autoRotate = !controls.autoRotate;
+            rotateBtn.setAttribute('aria-pressed', String(controls.autoRotate));
+        });
+
+        // ---------- Resize / render loop ----------
+        function resize() {
+            const w = stage.clientWidth;
+            const h = stage.clientHeight;
+            renderer.setSize(w, h, false);
+            camera.aspect = w / h;
+            // Pull the camera back on narrow screens so the whole tree fits.
+            camera.position.setLength(Math.max(16, 16 * Math.min(1.6, 0.95 / camera.aspect)));
+            camera.updateProjectionMatrix();
+        }
+
+        new ResizeObserver(resize).observe(stage);
+        resize();
+
+        const clock = new THREE.Clock();
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+        renderer.setAnimationLoop(() => {
+            const dt = clock.getDelta();
+            if (!reduceMotion) windUniforms.uTime.value += dt;
+
+            const t = reduceMotion ? 1 : Math.min((performance.now() - growStart) / 1400, 1);
+            const g = 0.001 + easeOutCubic(t) * 0.999;
+            treeGroup.scale.set(0.6 + g * 0.4, g, 0.6 + g * 0.4);
+
+            controls.update();
+            renderer.render(scene, camera);
+        });
+
+        buildTree();
+        window.__treeReady = true;
+        document.getElementById('loading').remove();
+    </script>
+</body>
+</html>

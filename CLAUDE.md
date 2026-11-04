@@ -8,6 +8,7 @@ This is a personal GitHub Pages portfolio site for Jingwen Ou (oujingwen.github.
 - A light-themed, animated single-page portfolio (`index.html`)
 - An 8-dimensional hypercube (octeract) projection visualization (`8d-hypercube.html`)
 - A standalone Super Mario-style browser game (`gemini3-demo.html`, also served at `/gemini3-demo/`)
+- A procedural 3D tree built with three.js (`tree-3d.html`)
 - Legacy React files (`app.js`, `index.js`, `package-lock.json`) from a previous iteration
 
 ## Deployment
@@ -34,7 +35,7 @@ A single-page portfolio with Jekyll front matter (`layout: null`) and inline sty
 - Hero section with headline, CTA buttons, and visual cards linking to the 8D and game projects plus a "5+ Years" stat
 - About section with stats (5+ years experience, 20+ projects, 1M+ lines of code)
 - Skills section: Frontend, Backend, Database, Tools
-- Projects section with two project cards: "8D Hypercube Visualization" and "Super Mario Browser Game"
+- Projects section with three project cards (3-column grid): "8D Hypercube Visualization", "Super Mario Browser Game", and "Procedural 3D Tree"
 - Contact section (GitHub link only) and footer
 - Responsive breakpoints at 1024px, 768px, and 480px
 
@@ -57,6 +58,16 @@ A standalone page (no front matter) with its UI written in Traditional Chinese (
 - The canvas edge colors (HSL by the s coordinate) encode data and are independent of the page theme
 - `prefers-reduced-motion: reduce` disables animations
 - Responsive breakpoint at 768px
+
+### Procedural 3D Tree (`tree-3d.html`)
+A standalone page (no front matter, `lang="zh-TW"`) rendering a low-poly tree with three.js:
+- three.js `0.160.0` is loaded from jsDelivr through an import map (`three` and `three/addons/`); it is the only external library on the site
+- Tree generation: seeded recursive branching (`mulberry32`), branch cylinders merged into one geometry with `mergeGeometries`, leaves drawn as one `InstancedMesh` with per-instance colors; the tree is normalized to `TREE_HEIGHT`
+- `SEGMENT_BUDGET` caps the branch count; the effective depth is reduced (with a note under the slider) when depth and branches per node would exceed it
+- Wind sway is a vertex shader patch (`onBeforeCompile` replacing `#include <project_vertex>`) applied to bark, leaves and their custom depth materials so shadows move too
+- Controls: depth, branches per node, branch angle, leaf density, wind, four seasons (winter has no leaves), regenerate with a new seed, auto-rotate toggle; OrbitControls for drag/zoom
+- Page chrome shares the homepage's visual style (tokens, fonts, noise overlay, background blobs, nav with a link back to the portfolio); responsive breakpoints at 960px and 480px
+- `prefers-reduced-motion: reduce` disables auto-rotate, wind and the growth animation
 
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
 A standalone Super Mario-style platformer written in vanilla JavaScript:
@@ -86,6 +97,7 @@ These files are not integrated with the current Jekyll site.
 ├── _config.yml              # Jekyll configuration
 ├── index.html               # Main portfolio page (Jekyll + HTML/CSS)
 ├── 8d-hypercube.html        # 8D hypercube projection visualization
+├── tree-3d.html             # Procedural 3D tree (three.js)
 ├── gemini3-demo.html        # Standalone game demo
 ├── gemini3-demo/
 │   └── index.html           # Copy of the game for the /gemini3-demo route
@@ -109,7 +121,7 @@ Since this is a Jekyll-based GitHub Pages site:
    ```bash
    bundle exec jekyll serve
    ```
-   The standalone pages (`8d-hypercube.html`, `gemini3-demo.html`) contain no Liquid and can also be opened directly in a browser.
+   The standalone pages (`8d-hypercube.html`, `gemini3-demo.html`, `tree-3d.html`) contain no Liquid and can also be opened directly in a browser.
 
 2. **Edit Content**: Modify the HTML files directly or update `_config.yml` for site metadata
 
@@ -123,10 +135,10 @@ Since this is a Jekyll-based GitHub Pages site:
 ## Key Considerations
 
 - **No Build Process**: The site is static HTML/CSS/JS served by Jekyll, no compilation needed
-- **Self-Contained Pages**: Each page keeps its CSS and JavaScript inline; there are no shared stylesheets or scripts
+- **Self-Contained Pages**: Each page keeps its CSS and JavaScript inline; there are no shared stylesheets or scripts (`tree-3d.html` loads three.js from a CDN)
 - **React Components**: The React code is legacy and not used by the site
 - **Character Encoding**: Earlier commits fixed emoji encoding issues - prefer text symbols over emoji when possible
-- **Language**: `index.html` is in English; `8d-hypercube.html` and the game are in Traditional Chinese (`zh-TW`)
+- **Language**: `index.html` is in English; `8d-hypercube.html`, `tree-3d.html` and the game are in Traditional Chinese (`zh-TW`)
 
 ## Content Updates
 

@@ -692,7 +692,7 @@ layout: null
 
     .projects-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 32px;
     }
 
@@ -785,6 +785,14 @@ layout: null
 
     .project-game::after {
       content: 'GAME';
+    }
+
+    .project-tree {
+      background: linear-gradient(135deg, #65a30d 0%, #16a34a 50%, #0d9488 100%);
+    }
+
+    .project-tree::after {
+      content: 'TREE';
     }
 
     .project-content {
@@ -1292,6 +1300,18 @@ layout: null
               <span class="tag">Game Dev</span>
               <span class="tag">Physics</span>
               <span class="tag">Web Audio</span>
+            </div>
+          </div>
+        </a>
+        <a href="tree-3d.html" class="project-card">
+          <div class="project-image project-tree"></div>
+          <div class="project-content">
+            <h3>Procedural 3D Tree</h3>
+            <p>A recursively generated low-poly tree rendered with three.js, with adjustable branching, four seasons, instanced leaves, and wind sway driven by a custom vertex shader.</p>
+            <div class="project-tags">
+              <span class="tag">three.js</span>
+              <span class="tag">WebGL</span>
+              <span class="tag">Procedural</span>
             </div>
           </div>
         </a>
