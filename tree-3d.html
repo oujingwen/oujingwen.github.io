@@ -408,6 +408,8 @@
             background: var(--accent-soft);
         }
 
+        .btn-download { grid-column: 1 / -1; }
+
         .seed {
             margin-top: 12px;
             font-family: var(--font-mono);
@@ -573,6 +575,7 @@
             <div class="actions">
                 <button type="button" class="btn btn-primary" id="regen">重新生成</button>
                 <button type="button" class="btn btn-ghost" id="rotate" aria-pressed="true">自動旋轉</button>
+                <button type="button" class="btn btn-ghost btn-download" id="download">下載 3D 模型（.glb）</button>
             </div>
             <div class="seed">seed <span id="seed-value">0</span></div>
         </aside>
@@ -592,6 +595,7 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
         const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const stage = document.getElementById('stage');
@@ -948,6 +952,94 @@
         rotateBtn.addEventListener('click', () => {
             controls.autoRotate = !controls.autoRotate;
             rotateBtn.setAttribute('aria-pressed', String(controls.autoRotate));
+        });
+
+        // ---------- Export ----------
+        // Bake the instanced leaves into one mesh with vertex colors, so any glTF viewer
+        // (Blender, Windows 3D Viewer, etc.) can open the file without instancing support.
+        function bakeLeaves() {
+            const src = leafGeometry;
+            const pos = src.attributes.position;
+            const nor = src.attributes.normal;
+            const idx = src.index;
+            const n = leafMesh.count;
+            const vc = pos.count;
+            const ic = idx.count;
+            const P = new Float32Array(n * vc * 3);
+            const N = new Float32Array(n * vc * 3);
+            const C = new Float32Array(n * vc * 3);
+            const I = new Uint32Array(n * ic);
+            const m = new THREE.Matrix4();
+            const nm = new THREE.Matrix3();
+            const v = new THREE.Vector3();
+            const c = new THREE.Color();
+            for (let i = 0; i < n; i++) {
+                leafMesh.getMatrixAt(i, m);
+                nm.getNormalMatrix(m);
+                leafMesh.getColorAt(i, c);
+                for (let j = 0; j < vc; j++) {
+                    const o = (i * vc + j) * 3;
+                    v.fromBufferAttribute(pos, j).applyMatrix4(m);
+                    P[o] = v.x; P[o + 1] = v.y; P[o + 2] = v.z;
+                    v.fromBufferAttribute(nor, j).applyMatrix3(nm).normalize();
+                    N[o] = v.x; N[o + 1] = v.y; N[o + 2] = v.z;
+                    C[o] = c.r; C[o + 1] = c.g; C[o + 2] = c.b;
+                }
+                for (let k = 0; k < ic; k++) I[i * ic + k] = idx.getX(k) + i * vc;
+            }
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+            g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+            g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+            g.setIndex(new THREE.BufferAttribute(I, 1));
+            return g;
+        }
+
+        const downloadBtn = document.getElementById('download');
+        downloadBtn.addEventListener('click', () => {
+            const label = downloadBtn.textContent;
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = '匯出中…';
+
+            const exportScene = new THREE.Scene();
+            const bark = new THREE.Mesh(barkMesh.geometry, new THREE.MeshStandardMaterial({
+                color: barkMaterial.color.clone(), roughness: 0.95, flatShading: true
+            }));
+            bark.name = 'Bark';
+            exportScene.add(bark);
+
+            let leafGeo = null;
+            if (leafMesh) {
+                leafGeo = bakeLeaves();
+                const leaves = new THREE.Mesh(leafGeo, new THREE.MeshStandardMaterial({
+                    vertexColors: true, roughness: 0.75, side: THREE.DoubleSide, flatShading: true
+                }));
+                leaves.name = 'Leaves';
+                exportScene.add(leaves);
+            }
+
+            const done = () => {
+                if (leafGeo) leafGeo.dispose();
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = label;
+            };
+
+            new GLTFExporter().parse(exportScene, (result) => {
+                const blob = new Blob([result], { type: 'model/gltf-binary' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'tree-' + state.season + '-' + state.seed + '.glb';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                done();
+            }, (err) => {
+                console.error(err);
+                alert('匯出失敗，請重新整理後再試一次。');
+                done();
+            }, { binary: true });
         });
 
         // ---------- Resize / render loop ----------

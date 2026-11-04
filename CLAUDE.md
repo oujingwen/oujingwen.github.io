@@ -66,6 +66,7 @@ A standalone page (no front matter, `lang="zh-TW"`) rendering a low-poly tree wi
 - `SEGMENT_BUDGET` caps the branch count; the effective depth is reduced (with a note under the slider) when depth and branches per node would exceed it
 - Wind sway is a vertex shader patch (`onBeforeCompile` replacing `#include <project_vertex>`) applied to bark, leaves and their custom depth materials so shadows move too
 - Controls: depth, branches per node, branch angle, leaf density, wind, four seasons (winter has no leaves), regenerate with a new seed, auto-rotate toggle; OrbitControls for drag/zoom
+- "下載 3D 模型" exports the current tree as a `.glb` via `GLTFExporter`; leaves are baked from the `InstancedMesh` into one mesh with vertex colors so viewers without instancing support can open it (wind and growth animation are not exported)
 - Page chrome shares the homepage's visual style (tokens, fonts, noise overlay, background blobs, nav with a link back to the portfolio); responsive breakpoints at 960px and 480px
 - `prefers-reduced-motion: reduce` disables auto-rotate, wind and the growth animation
 
