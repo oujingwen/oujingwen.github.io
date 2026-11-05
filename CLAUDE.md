@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 This is a personal GitHub Pages portfolio site for Jingwen Ou (oujingwen.github.io) built with Jekyll. The repository contains:
-- A light-themed, animated single-page portfolio (`index.html`)
+- A single-page portfolio typeset like a short technical paper (`index.html`)
 - An 8-dimensional hypercube (octeract) projection visualization (`8d-hypercube.html`)
 - A standalone Super Mario-style browser game (`gemini3-demo.html`, also served at `/gemini3-demo/`)
 - Legacy React files (`app.js`, `index.js`, `package-lock.json`) from a previous iteration
@@ -27,36 +27,40 @@ Changes pushed to the `gh-pages` branch are automatically deployed to GitHub Pag
 - Description: Personal developer portfolio
 
 ### Main Landing Page (`index.html`)
-A single-page portfolio with Jekyll front matter (`layout: null`) and inline styles:
-- Light theme with an orange accent, defined as CSS custom properties on `:root` (`--accent: #ea580c` for decoration, `--accent-strong: #c2410c` for small text and buttons to keep contrast on light backgrounds)
-- Google Fonts: Instrument Serif, DM Sans, JetBrains Mono
-- Fixed nav with "JO" logo and anchor links (About, Skills, Projects, Contact)
-- Hero section with headline, CTA buttons, and visual cards linking to the 8D and game projects plus a "5+ Years" stat
-- About section with stats (5+ years experience, 20+ projects, 1M+ lines of code)
-- Skills section: Frontend, Backend, Database, Tools
-- Projects section with two project cards: "8D Hypercube Visualization" and "Super Mario Browser Game"
-- Contact section (GitHub link only) and footer
-- Responsive breakpoints at 1024px, 768px, and 480px
+A single-page portfolio with Jekyll front matter (`layout: null`), typeset like a short technical paper:
+- Warm paper background, ink text and one ink-blue accent, defined as CSS custom properties on `:root` (`--paper: #f4f0e6`, `--ink: #1c1a15`, `--accent: #2b45b5`). Light only; there is no dark theme
+- Google Fonts: Newsreader (text, uses optical sizes) and IBM Plex Mono (labels, captions, navigation)
+- Layout: a `.cols` grid with a reading column (`main`) and a margin column (`side`) for notes. Sections use CSS subgrid (`.sub`, `.block`) so margin notes line up with their text. Below 1080px the margin collapses and notes follow the text
+- Sticky running head with the "JO" logo and anchor links (About, Skills, Projects, Contact); the link for the section in view is highlighted
+- Hero: kicker, headline, intro and two text links, with Fig. 1 on the right
+- Sections are numbered with CSS counters (`§1`–`§4`; project entries `3.1`, `3.2`): About (text, stats table in the margin), Expertise (skills as a dot-leader list), Work (project entries with tags in the margin, each followed by a figure), Connect (GitHub link)
+- Footer: "Designed & Built by Jingwen Ou"
 
-Jekyll Liquid is used only in `<head>`: `{{ site.title }}` and `{{ site.description }}`.
+Jekyll Liquid is used only in `<head>`: `{{ site.title }}` and `{{ site.description }}`. Do not use `{{` or `{%` anywhere else in the file.
 
-Animations:
-- CSS keyframes: nav slide-in, word-by-word hero title reveal, shimmering gradient on the title `<em>`, drifting background blobs, floating hero cards, shifting gradients on project images, breathing glow in the contact section
-- Hover effects: underline on nav links, sheen on the primary button, lift and shadow on cards, cursor-following spotlight on skill cards
-- An inline script at the end of `<body>` handles: scroll progress bar, nav background and active link on scroll, scroll-reveal with staggered cards (`.reveal` / `.in-view` / `.settled` classes, added by JS), count-up numbers (`data-count` / `data-suffix`), and pointer parallax on hero cards
-- A script in `<head>` adds the `js` class to `<html>`; reveal styles only hide content under `.js`, so the page stays visible without JavaScript
-- `prefers-reduced-motion: reduce` disables animations and transitions
+Figures (vanilla JavaScript, no libraries):
+- Fig. 1 (`#fig1`): a tesseract rotating in the XW and ZW planes; drag or the arrow keys rotate it, double-click resets, and the caption shows the current angles
+- Fig. 2 (`#fig2`, links to the 8D page): Petrie projection of the 8-cube, plotted one dimension at a time when it scrolls into view
+- Fig. 3 (inline SVG, links to the game): jump trajectory schematic; the arc draws in when it scrolls into view
+- Canvases are sized with `ResizeObserver` and `devicePixelRatio`; Fig. 1 pauses when off screen
+
+Other behavior:
+- The reading progress bar uses a CSS scroll-driven animation (`animation-timeline: scroll()`) with a JS fallback
+- Sections fade in on scroll (`.reveal` / `.in-view`, added by JS); a script in `<head>` adds the `js` class, so content stays visible without JavaScript
+- `prefers-reduced-motion: reduce` stops animations, and Fig. 2 is drawn complete
+- Print stylesheet hides the navigation and prints link URLs
 
 ### 8D Hypercube Visualization (`8d-hypercube.html`)
 A standalone page (no front matter) with its UI written in Traditional Chinese (`lang="zh-TW"`):
 - Canvas-based projections of the 8-dimensional hypercube, rendered with vanilla JavaScript (no external libraries)
-- Sections: octeract statistics, six projection views, and a comparison table of hypercubes across dimensions
-- Shares the homepage's visual style: same color tokens (`--accent`, `--accent-strong`, etc.), fonts (Instrument Serif / DM Sans / JetBrains Mono, with Noto Serif TC / Noto Sans TC for Chinese), fixed nav with a link back to the portfolio, scroll progress bar, drifting background blobs
-- Animations: scroll-reveal for sections and stat cards, count-up stats (`data-count`), staggered table rows, a highlight that cycles through the 8D -> 2D dimension nodes, ripple on button press, pulsing auto-rotate button while rotating
-- The animation script at the end of `<body>` wraps the global `autoRotate` / `stopRotation` functions to toggle the `.running` class; keep these functions global since the buttons call them via inline `onclick`
+- Sections: octeract statistics, the projection canvas, rotation controls for the 28 planes, four explanatory sections, and a comparison table of hypercubes across dimensions
+- Same paper style as `index.html`: color tokens (`--paper`, `--ink`, `--accent: #2b45b5`), the `.cols` layout with a reading column and wide blocks, a sticky running head with "JO" and a link back to the portfolio, sections numbered with CSS counters (`§1`–`§8`), formula boxes numbered as equations, and a ruled comparison table
+- Fonts: Newsreader and IBM Plex Mono, with Noto Serif TC / Noto Sans TC for Chinese. Chinese emphasis (`.title em`) uses the accent color instead of italics
+- The first script (rotation math, `draw8DHypercube`, the rotate functions, `autoRotate` / `stopRotation` / `reset8D`) is the original visualization code. The second script wraps the global `autoRotate` / `stopRotation` to toggle the `.running` class; keep these functions global since the buttons call them via inline `onclick`
+- Other behavior: reading progress bar, scroll reveal, and a highlight that cycles through the 8D -> 2D dimension nodes
 - The canvas edge colors (HSL by the s coordinate) encode data and are independent of the page theme
 - `prefers-reduced-motion: reduce` disables animations
-- Responsive breakpoint at 768px
+- Responsive: single column below 1080px; compact dimension nodes and two-column stats below 640px
 
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
 A standalone Super Mario-style platformer written in vanilla JavaScript:
@@ -65,8 +69,8 @@ A standalone Super Mario-style platformer written in vanilla JavaScript:
 - Touch controls for mobile devices
 - Web Audio API for sound effects and background music
 - Game features: enemies (Goombas), collectible coins, platforms, pipes, and flag goal
-- Page chrome shares the homepage's visual style: color tokens, fonts, noise overlay, drifting background blobs, fixed nav with a link back to the portfolio (root-relative `/` links, so they work from both `/gemini3-demo.html` and `/gemini3-demo/`), animated gradient frame around the game, frosted light start/game-over overlay, pill-shaped character buttons, keyboard hints on desktop, light touch buttons on mobile
-- The canvas is scaled with CSS to fit the viewport height (`--chrome-h` is the vertical space reserved for everything except the canvas); its internal resolution stays 800x450
+- Page chrome uses the same paper style as `index.html`: color tokens, Newsreader / IBM Plex Mono (Noto Sans TC for Chinese), a fixed running head with "JO" and a link back to the portfolio (root-relative `/` links, so they work from both `/gemini3-demo.html` and `/gemini3-demo/`), a 1px ink frame around the game, a translucent paper start/game-over overlay, outlined character buttons (the selected one in the accent color), keyboard hints on desktop, outlined touch buttons on mobile
+- The header, game frame and hints share one width (`.stage`, `--game-w`). The canvas is scaled with CSS to fit the viewport height (`--chrome-h` is the vertical space reserved for everything except the canvas); its internal resolution stays 800x450
 - The game script looks up `#start-screen h1` and `#start-screen p` to change the overlay text, so keep a single `h1` and make the start prompt the first `p` inside `#start-screen`
 
 `gemini3-demo/index.html` is an identical copy that exposes the `/gemini3-demo` route. **When editing the game, apply the same change to both files** (or keep them in sync with `cp gemini3-demo.html gemini3-demo/index.html`).
@@ -131,8 +135,8 @@ Since this is a Jekyll-based GitHub Pages site:
 ## Content Updates
 
 To update portfolio sections in `index.html`:
-- **Personal Info**: Modify `_config.yml` (title, description) or hardcoded content in the hero and about sections
-- **Skills**: Edit the `skill-card` divs in the `#skills` section
-- **Projects**: Add or edit `project-card` links in the `#projects` section; when adding a new project page, consider also linking it from the hero `visual-card` elements
-- **Contact Links**: Update the `contact-links` section (currently only GitHub)
-- **Stats**: Update the `stat-card` numbers in the about section and the "5+" stat in the hero `card-3`; keep each element's `data-count` and `data-suffix` attributes in sync with its text, since the count-up animation renders from them
+- **Personal Info**: Modify `_config.yml` (title, description) or the hero and About text
+- **Skills**: Edit the rows of `dl.leaders` in the `#skills` section (`dt` holds the glyph and group name, `dd` the list)
+- **Projects**: Each project is an `article.block.entry` (title link, description, `ul.note.tags`) followed by its `figure`; entry numbers come from CSS counters, so no manual numbering is needed
+- **Contact Links**: Update `.contact-links` in the `#contact` section (currently only GitHub)
+- **Stats**: Update `table.facts` in the About section's margin note

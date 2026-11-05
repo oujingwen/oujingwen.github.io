@@ -6,31 +6,28 @@
     <title>Super Mario Browser Game - Jingwen Ou</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..500;1,6..72,400..500&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        /* Same paper style as the homepage; the game itself is unchanged */
         :root {
-            --bg-primary: #fbfaf8;
-            --bg-secondary: #f4f2ee;
-            --bg-card: #ffffff;
-            --text-primary: #18181b;
-            --text-secondary: #52525b;
-            --text-muted: #6b6b73;
-            --accent: #ea580c;
-            --accent-strong: #c2410c;
-            --accent-soft: rgba(234, 88, 12, 0.08);
-            --accent-glow: rgba(234, 88, 12, 0.28);
-            --pink: #ec4899;
-            --violet: #8b5cf6;
-            --border: rgba(24, 24, 27, 0.08);
-            --border-strong: rgba(24, 24, 27, 0.14);
-            --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04), 0 4px 12px rgba(24, 24, 27, 0.04);
-            --shadow-lg: 0 24px 48px rgba(24, 24, 27, 0.12);
-            --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-            --font-sans: 'DM Sans', 'Noto Sans TC', -apple-system, sans-serif;
-            --font-mono: 'JetBrains Mono', 'Noto Sans TC', monospace;
+            --paper: #f4f0e6;
+            --paper-2: #ebe5d7;
+            --ink: #1c1a15;
+            --ink-2: #5c5648;
+            --rule: rgba(28, 26, 21, 0.2);
+            --accent: #2b45b5;
+            --serif: 'Newsreader', Georgia, serif;
+            --mono: 'IBM Plex Mono', 'Noto Sans TC', ui-monospace, SFMono-Regular, Menlo, monospace;
+            --ease: cubic-bezier(0.2, 0.7, 0, 1);
             /* Vertical space used by everything except the canvas:
                body padding (nav) + header + frame border + hints */
             --chrome-h: 270px;
+            /* Game width: fits the viewport height while keeping 16:9 */
+            --game-w: min(800px, calc(100vw - 40px), calc((100vh - var(--chrome-h)) * 16 / 9));
+        }
+
+        @supports (height: 100dvh) {
+            :root { --game-w: min(800px, calc(100vw - 40px), calc((100dvh - var(--chrome-h)) * 16 / 9)); }
         }
 
         * { box-sizing: border-box; }
@@ -38,559 +35,358 @@
         html, body { height: 100%; }
 
         body {
-            margin: 0; padding: 0;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            margin: 0;
+            padding: 76px 0 16px;
+            background: var(--paper);
+            color: var(--ink);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             min-height: 100dvh;
-            padding: 76px 0 16px;
-            font-family: var(--font-sans);
+            font-family: var(--serif);
             overflow: hidden;
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Noise texture overlay */
-        body::before {
-            content: '';
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        /* Running head */
+        .masthead {
             position: fixed;
-            inset: 0;
-            pointer-events: none;
-            opacity: 0.035;
-            z-index: 1000;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-        }
-
-        /* Ambient background */
-        .ambient-bg {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-
-        .ambient-bg::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background-image: radial-gradient(rgba(24, 24, 27, 0.08) 1px, transparent 1px);
-            background-size: 28px 28px;
-            -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 0%, transparent 70%);
-            mask-image: radial-gradient(ellipse at 50% 50%, #000 0%, transparent 70%);
-        }
-
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(70px);
-            opacity: 0.45;
-            will-change: transform;
-        }
-
-        .orb-1 {
-            width: 480px; height: 480px;
-            top: -140px; right: -80px;
-            background: radial-gradient(circle, #fdba74 0%, transparent 70%);
-            animation: drift1 18s ease-in-out infinite alternate;
-        }
-
-        .orb-2 {
-            width: 420px; height: 420px;
-            bottom: -140px; left: -100px;
-            background: radial-gradient(circle, #c4b5fd 0%, transparent 70%);
-            animation: drift2 22s ease-in-out infinite alternate;
-        }
-
-        .orb-3 {
-            width: 320px; height: 320px;
-            top: 35%; left: 55%;
-            background: radial-gradient(circle, #f9a8d4 0%, transparent 70%);
-            opacity: 0.3;
-            animation: drift3 26s ease-in-out infinite alternate;
-        }
-
-        /* Navigation */
-        nav {
-            position: fixed;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             z-index: 100;
-            padding: 20px 0;
-            animation: slideDown 0.8s var(--ease-out) both;
+            padding-top: 14px;
+            background: var(--paper);
         }
 
-        .nav-inner {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 clamp(20px, 5vw, 80px);
+        .mh {
             display: flex;
+            align-items: baseline;
             justify-content: space-between;
-            align-items: center;
+            gap: 20px;
+            width: min(964px, calc(100% - 40px));
+            margin: 0 auto;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--rule);
         }
 
         .logo {
-            font-family: 'Instrument Serif', Georgia, serif;
-            font-size: 1.5rem;
-            color: var(--text-primary);
+            font-family: var(--serif);
+            font-size: 1.3rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            color: var(--ink);
             text-decoration: none;
-            letter-spacing: -0.02em;
-            display: inline-block;
-            transition: transform 0.4s var(--ease-out), color 0.3s ease;
         }
 
-        .logo:hover {
-            color: var(--accent);
-            transform: rotate(-6deg) scale(1.08);
-        }
+        .logo:hover { color: var(--accent); }
 
         .back-link {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            text-decoration: none;
             display: inline-flex;
-            align-items: center;
             gap: 6px;
-            transition: color 0.2s ease;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--ink-2);
+            text-decoration: none;
         }
 
-        .back-link .arrow {
-            display: inline-block;
-            transition: transform 0.3s var(--ease-out);
-        }
+        .back-link:hover { color: var(--accent); }
+        .back-link .arrow { transition: transform 0.3s var(--ease); }
+        .back-link:hover .arrow { transform: translateX(-3px); }
 
-        .back-link:hover { color: var(--text-primary); }
-        .back-link:hover .arrow { transform: translateX(-4px); }
+        /* Header, game and hints share one width */
+        .stage { width: var(--game-w); }
 
-        /* Page header */
-        .page-header {
-            position: relative;
-            z-index: 1;
-            text-align: center;
-            margin-bottom: 20px;
-        }
+        .page-header { margin-bottom: 14px; }
 
-        .page-label {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--accent-strong);
+        .kicker {
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            letter-spacing: 0.15em;
-            margin-bottom: 8px;
-            animation: fadeInUp 0.8s var(--ease-out) 0.1s both;
-        }
-
-        .page-label::before {
-            content: '';
-            width: 24px;
-            height: 1px;
-            background: var(--accent);
-        }
-
-        .page-label::after {
-            content: '';
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent);
-            animation: pulse 2s ease-in-out infinite;
+            color: var(--ink-2);
+            animation: up 0.9s var(--ease) both;
         }
 
         .page-title {
-            font-family: 'Instrument Serif', Georgia, serif;
-            font-size: clamp(2rem, 4.5vw, 3rem);
+            margin: 6px 0 0;
+            font-size: clamp(1.9rem, 4vw, 2.75rem);
             font-weight: 400;
-            letter-spacing: -0.02em;
             line-height: 1.1;
-            margin: 0;
-            animation: fadeInUp 0.8s var(--ease-out) 0.2s both;
+            letter-spacing: -0.015em;
+            font-variation-settings: 'opsz' 72;
+            animation: up 0.9s var(--ease) 0.08s both;
         }
 
-        .page-title em {
-            font-style: italic;
-            background: linear-gradient(100deg, #ea580c 0%, #ec4899 50%, #ea580c 100%);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            animation: shimmer 6s linear infinite;
-            padding-right: 0.06em;
-        }
+        .page-title em { font-style: italic; }
 
-        /* Game frame */
         .game-frame {
-            position: relative;
-            z-index: 1;
-            padding: 3px;
-            border-radius: 20px;
-            background: linear-gradient(135deg, var(--accent), var(--pink), var(--violet), var(--pink), var(--accent));
-            background-size: 300% 300%;
-            box-shadow: var(--shadow-lg);
-            animation: cardIn 1s var(--ease-out) 0.3s both, gradientShift 10s ease infinite;
+            border: 1px solid var(--ink);
+            animation: fade 1s var(--ease) 0.2s both;
         }
 
         #game-container {
             position: relative;
-            border-radius: 17px;
             overflow: hidden;
             background: #5c94fc;
         }
 
         canvas {
-            background-color: #5c94fc;
             display: block;
-            image-rendering: pixelated;
-            /* Scale down to fit the viewport height while keeping 16:9 */
-            width: min(800px, calc(100vw - 40px), calc((100vh - var(--chrome-h)) * 16 / 9));
-            width: min(800px, calc(100vw - 40px), calc((100dvh - var(--chrome-h)) * 16 / 9));
+            width: 100%;
             height: auto;
+            background-color: #5c94fc;
+            image-rendering: pixelated;
         }
 
         /* HUD */
         #ui-layer {
             position: absolute;
-            top: 12px; left: 12px;
-            color: white;
-            font-family: var(--font-mono);
-            font-weight: 700;
-            font-size: 15px;
-            line-height: 1.35;
-            letter-spacing: 0.06em;
-            padding: 8px 12px;
-            border-radius: 10px;
-            background: rgba(24, 24, 27, 0.28);
-            -webkit-backdrop-filter: blur(6px);
-            backdrop-filter: blur(6px);
-            pointer-events: none;
+            top: 10px;
+            left: 10px;
             z-index: 10;
+            padding: 6px 10px;
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1.4;
+            letter-spacing: 0.06em;
+            color: #fff;
+            background: rgba(28, 26, 21, 0.35);
+            pointer-events: none;
         }
 
-        #ui-layer small {
-            font-weight: 500;
-            font-size: 12px;
-            opacity: 0.9;
-        }
+        #ui-layer small { font-size: 11px; font-weight: 400; opacity: 0.9; }
 
         #sound-toggle {
-            position: absolute; top: 12px; right: 12px;
-            background: rgba(255, 255, 255, 0.85);
-            color: var(--text-primary);
-            border: 1px solid var(--border-strong);
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            right: 10px;
             z-index: 15;
-            -webkit-backdrop-filter: blur(6px);
-            backdrop-filter: blur(6px);
-            transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease, background 0.3s ease;
+            padding: 4px 9px;
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--ink);
+            cursor: pointer;
+            transition: background-color 0.2s var(--ease);
         }
 
-        #sound-toggle:hover {
-            background: #fff;
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-sm);
-        }
+        #sound-toggle:hover { background: #fff; }
 
         /* Start / game over screen */
         #start-screen {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(251, 250, 248, 0.82);
-            -webkit-backdrop-filter: blur(8px);
-            backdrop-filter: blur(8px);
+            inset: 0;
+            z-index: 20;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: var(--text-primary);
-            z-index: 20;
-            cursor: pointer;
-            text-align: center;
             padding: 16px;
-            animation: fadeIn 0.5s ease both;
+            text-align: center;
+            color: var(--ink);
+            background: rgba(244, 240, 230, 0.88);
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+            cursor: pointer;
+            animation: fade 0.4s ease both;
         }
 
         #start-screen h1 {
-            font-family: 'Instrument Serif', Georgia, serif;
+            margin: 0;
+            font-family: var(--serif);
+            font-size: clamp(26px, 5.6vw, 48px);
             font-weight: 400;
-            font-size: clamp(28px, 6vw, 52px);
-            letter-spacing: -0.01em;
             line-height: 1.05;
-            margin: 0 0 4px;
-            animation: popIn 0.7s var(--ease-out) 0.5s both;
+            letter-spacing: 0.01em;
+            animation: up 0.6s var(--ease) 0.3s both;
         }
 
         .char-select {
-            margin: 18px 0;
             z-index: 30;
-            animation: fadeInUp 0.7s var(--ease-out) 0.65s both;
+            margin: 18px 0;
+            animation: up 0.6s var(--ease) 0.4s both;
         }
 
         .char-select-label {
             margin-bottom: 10px;
-            font-family: var(--font-mono);
+            font-family: var(--mono);
             font-size: 11px;
-            font-weight: 500;
-            color: var(--accent-strong);
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.1em;
+            color: var(--ink-2);
         }
 
         .char-btn {
-            background: var(--bg-card);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-strong);
-            padding: 9px 16px;
             margin: 4px;
+            padding: 7px 14px;
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--rule);
             cursor: pointer;
-            font-family: var(--font-sans);
-            font-size: 14px;
-            font-weight: 500;
-            border-radius: 999px;
-            transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+            transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), color 0.2s var(--ease);
         }
 
-        .char-btn:hover {
-            color: var(--text-primary);
-            border-color: var(--text-primary);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-sm);
-        }
+        .char-btn:hover { border-color: var(--ink); }
 
         .char-btn.selected {
-            background: var(--accent-strong);
-            color: white;
-            border-color: transparent;
-            box-shadow: 0 8px 20px var(--accent-glow);
-        }
-
-        .char-btn:focus-visible {
-            outline: 2px solid var(--accent);
-            outline-offset: 2px;
+            color: #fff;
+            background: var(--accent);
+            border-color: var(--accent);
         }
 
         #start-screen p {
             margin: 0;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            animation: fadeIn 0.6s ease 0.8s both;
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--ink-2);
+            animation: fade 0.6s ease 0.5s both;
         }
 
-        .blink { animation: softBlink 1.6s ease-in-out infinite !important; }
+        .blink { animation: soft-blink 1.6s ease-in-out infinite !important; }
 
         /* Keyboard hints (desktop) */
         .hints {
-            position: relative;
-            z-index: 1;
             display: flex;
-            gap: 20px;
-            justify-content: center;
             flex-wrap: wrap;
-            margin-top: 18px;
-            font-size: 13px;
-            color: var(--text-muted);
-            animation: fadeInUp 0.8s var(--ease-out) 0.6s both;
+            gap: 18px;
+            margin-top: 12px;
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--ink-2);
+            animation: fade 0.8s var(--ease) 0.4s both;
         }
 
-        .hints span {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .hints span { display: inline-flex; align-items: center; gap: 6px; }
 
         kbd {
-            font-family: var(--font-mono);
+            padding: 1px 6px;
+            font-family: var(--mono);
             font-size: 11px;
-            font-weight: 500;
-            color: var(--text-primary);
-            background: var(--bg-card);
-            border: 1px solid var(--border-strong);
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--rule);
             border-bottom-width: 2px;
-            border-radius: 6px;
-            padding: 2px 7px;
         }
 
         /* Touch controls (mobile) */
         .controls {
-            position: relative;
-            z-index: 1;
             display: none;
-            width: 100%; max-width: 800px; height: 110px;
-            margin-top: 14px; justify-content: space-between; align-items: center;
+            width: 100%;
+            max-width: 800px;
+            height: 110px;
+            margin-top: 14px;
             padding: 0 20px;
-            animation: fadeInUp 0.8s var(--ease-out) 0.6s both;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .btn {
-            background: var(--bg-card);
-            border: 1px solid var(--border-strong);
-            border-radius: 50%; width: 66px; height: 66px;
-            display: flex; align-items: center; justify-content: center;
-            font-family: var(--font-mono);
-            font-size: 22px; font-weight: 700;
-            color: var(--text-primary);
-            box-shadow: var(--shadow-sm);
-            transition: transform 0.15s var(--ease-out), background 0.15s ease, box-shadow 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            font-family: var(--mono);
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--ink);
+            border-radius: 50%;
+            transition: transform 0.15s var(--ease), background-color 0.15s ease;
         }
 
-        .btn:active {
-            transform: scale(0.92);
-            background: var(--bg-secondary);
-            box-shadow: none;
-        }
+        .btn:active { transform: scale(0.92); background: var(--paper-2); }
 
         .btn-jump {
-            background: var(--accent-strong);
-            border-color: transparent;
-            color: white;
-            box-shadow: 0 8px 20px var(--accent-glow);
+            color: #fff;
+            background: var(--accent);
+            border-color: var(--accent);
         }
 
-        .btn-jump:active { background: #9a3412; }
-
+        .btn-jump:active { background: #22389a; }
         .btn-reset { font-size: 15px; }
-
         .d-pad, .action-pad { display: flex; gap: 15px; }
 
-        /* Animations */
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-100%); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes cardIn {
-            from { opacity: 0; transform: translateY(30px) scale(0.96); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        @keyframes popIn {
-            0% { opacity: 0; transform: scale(0.8); }
-            60% { opacity: 1; transform: scale(1.04); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-
-        @keyframes softBlink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.35; }
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.35; transform: scale(0.7); }
-        }
-
-        @keyframes shimmer { to { background-position: 200% center; } }
-
-        @keyframes gradientShift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-        }
-
-        @keyframes drift1 {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-120px, 80px) scale(1.15); }
-        }
-
-        @keyframes drift2 {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(140px, -60px) scale(1.1); }
-        }
-
-        @keyframes drift3 {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-80px, -100px) scale(0.85); }
-        }
+        @keyframes up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes soft-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
         @media (max-width: 800px) {
             :root { --chrome-h: 300px; }
             .controls { display: flex; }
             .hints { display: none; }
-            .page-header { margin-bottom: 14px; }
-            .game-frame { border-radius: 14px; padding: 2px; }
-            #game-container { border-radius: 12px; }
-            #ui-layer { top: 8px; left: 8px; font-size: 12px; padding: 6px 9px; }
+            #ui-layer { top: 8px; left: 8px; padding: 5px 8px; font-size: 12px; }
             #ui-layer small { font-size: 10px; }
-            #sound-toggle { top: 8px; right: 8px; font-size: 11px; padding: 4px 10px; }
+            #sound-toggle { top: 8px; right: 8px; font-size: 11px; padding: 3px 8px; }
         }
 
         @media (max-width: 480px) {
-            .page-label { display: none; }
-            .char-btn { padding: 6px 12px; font-size: 13px; }
+            .char-btn { padding: 6px 11px; font-size: 12px; }
             .char-select { margin: 10px 0; }
         }
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
-                animation-duration: 0.01ms !important;
+                animation-duration: 0.001ms !important;
+                animation-delay: 0s !important;
                 animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
+                transition-duration: 0.001ms !important;
             }
         }
     </style>
 </head>
 <body>
-    <div class="ambient-bg" aria-hidden="true">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
-
-    <nav>
-        <div class="nav-inner">
+    <nav class="masthead" aria-label="Primary">
+        <div class="mh">
             <a href="/" class="logo" aria-label="Jingwen Ou 首頁">JO</a>
             <a href="/#projects" class="back-link"><span class="arrow">&larr;</span> 回到作品集</a>
         </div>
     </nav>
 
-    <header class="page-header">
-        <div class="page-label">Browser Game</div>
-        <h2 class="page-title">Super Mario <em>Browser</em> Game</h2>
-    </header>
+    <div class="stage">
+        <header class="page-header">
+            <div class="kicker">Browser Game</div>
+            <h2 class="page-title">Super Mario <em>Browser</em> Game</h2>
+        </header>
 
-    <div class="game-frame">
-    <div id="game-container">
-        <div id="ui-layer">WORLD 1-1 <br><small>SCORE: <span id="score">0</span></small></div>
-        <div id="sound-toggle">🔊 聲音: 開</div>
+        <div class="game-frame">
+        <div id="game-container">
+            <div id="ui-layer">WORLD 1-1 <br><small>SCORE: <span id="score">0</span></small></div>
+            <div id="sound-toggle">🔊 聲音: 開</div>
 
-        <div id="start-screen">
-            <h1>SUPER MARIO JS</h1>
+            <div id="start-screen">
+                <h1>SUPER MARIO JS</h1>
 
-            <div class="char-select">
-                <div class="char-select-label">選擇角色</div>
-                <button class="char-btn selected" onclick="selectChar('mario', this)">瑪利歐</button>
-                <button class="char-btn" onclick="selectChar('thomas', this)">湯瑪士</button>
-                <button class="char-btn" onclick="selectChar('po', this)">天線寶寶</button>
+                <div class="char-select">
+                    <div class="char-select-label">選擇角色</div>
+                    <button class="char-btn selected" onclick="selectChar('mario', this)">瑪利歐</button>
+                    <button class="char-btn" onclick="selectChar('thomas', this)">湯瑪士</button>
+                    <button class="char-btn" onclick="selectChar('po', this)">天線寶寶</button>
+                </div>
+
+                <p class="blink">點擊畫面或按任意鍵開始</p>
             </div>
 
-            <p class="blink">點擊畫面或按任意鍵開始</p>
+            <canvas id="gameCanvas" width="800" height="450"></canvas>
+        </div>
         </div>
 
-        <canvas id="gameCanvas" width="800" height="450"></canvas>
-    </div>
-    </div>
-
-    <div class="hints" aria-label="鍵盤操作">
-        <span><kbd>&larr;</kbd><kbd>&rarr;</kbd> 移動</span>
-        <span><kbd>Space</kbd> / <kbd>&uarr;</kbd> / <kbd>Z</kbd> 跳躍</span>
+        <div class="hints" aria-label="鍵盤操作">
+            <span><kbd>&larr;</kbd><kbd>&rarr;</kbd> 移動</span>
+            <span><kbd>Space</kbd> / <kbd>&uarr;</kbd> / <kbd>Z</kbd> 跳躍</span>
+        </div>
     </div>
 
     <div class="controls">
