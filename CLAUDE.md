@@ -124,7 +124,7 @@ These files are not integrated with the Jekyll site and cannot be built as they 
 - **No Build Process**: The site is static HTML/CSS/JS served by Jekyll, no compilation needed
 - **Self-Contained Pages**: Each page keeps its CSS and JavaScript inline; style changes must be repeated on every page (see Shared Visual Style)
 - **React Components**: The React code is legacy and not used by the site
-- **Character Encoding**: Earlier commits fixed emoji encoding issues - prefer text symbols over emoji. The game's sound toggle still uses 🔊 / 🔇, set in both the markup and the game script
+- **Character Encoding**: Earlier commits fixed emoji encoding issues - use text symbols instead of emoji. For example, the game's sound toggle shows ♪ (on) and × (off), set in both the markup and the game script
 - **Language**: `index.html` is in English; `8d-hypercube.html` is in Traditional Chinese; the game page is `zh-TW` with an English header
 
 ## Content Updates
