@@ -364,7 +364,7 @@
         <div class="game-frame">
         <div id="game-container">
             <div id="ui-layer">WORLD 1-1 <br><small>SCORE: <span id="score">0</span></small></div>
-            <div id="sound-toggle">🔊 聲音: 開</div>
+            <div id="sound-toggle">♪ 聲音: 開</div>
 
             <div id="start-screen">
                 <h1>SUPER MARIO JS</h1>
@@ -961,7 +961,7 @@ window.addEventListener('keyup', e => {
 });
 document.getElementById('sound-toggle').addEventListener('click', (e) => {
     e.stopPropagation(); let muted = AudioEngine.toggleMute();
-    e.target.innerText = muted ? "🔇 聲音: 關" : "🔊 聲音: 開";
+    e.target.innerText = muted ? "× 聲音: 關" : "♪ 聲音: 開";
 });
 const bindTouch = (id, k) => {
     let btn = document.getElementById(id);
