@@ -53,13 +53,14 @@ Other behavior:
 ### 8D Hypercube Visualization (`8d-hypercube.html`)
 A standalone page (no front matter) with its UI written in Traditional Chinese (`lang="zh-TW"`):
 - Canvas-based projections of the 8-dimensional hypercube, rendered with vanilla JavaScript (no external libraries)
-- Sections: octeract statistics, six projection views, and a comparison table of hypercubes across dimensions
-- Uses the orange-accent light style of the previous homepage design (not yet the paper style of `index.html`): color tokens (`--accent: #ea580c`, `--accent-strong`, etc.), fonts (Instrument Serif / DM Sans / JetBrains Mono, with Noto Serif TC / Noto Sans TC for Chinese), fixed nav with a link back to the portfolio, scroll progress bar, drifting background blobs
-- Animations: scroll-reveal for sections and stat cards, count-up stats (`data-count`), staggered table rows, a highlight that cycles through the 8D -> 2D dimension nodes, ripple on button press, pulsing auto-rotate button while rotating
-- The animation script at the end of `<body>` wraps the global `autoRotate` / `stopRotation` functions to toggle the `.running` class; keep these functions global since the buttons call them via inline `onclick`
+- Sections: octeract statistics, the projection canvas, rotation controls for the 28 planes, four explanatory sections, and a comparison table of hypercubes across dimensions
+- Same paper style as `index.html`: color tokens (`--paper`, `--ink`, `--accent: #2b45b5`), the `.cols` layout with a reading column and wide blocks, a sticky running head with "JO" and a link back to the portfolio, sections numbered with CSS counters (`§1`–`§8`), formula boxes numbered as equations, and a ruled comparison table
+- Fonts: Newsreader and IBM Plex Mono, with Noto Serif TC / Noto Sans TC for Chinese. Chinese emphasis (`.title em`) uses the accent color instead of italics
+- The first script (rotation math, `draw8DHypercube`, the rotate functions, `autoRotate` / `stopRotation` / `reset8D`) is the original visualization code. The second script wraps the global `autoRotate` / `stopRotation` to toggle the `.running` class; keep these functions global since the buttons call them via inline `onclick`
+- Other behavior: reading progress bar, scroll reveal, and a highlight that cycles through the 8D -> 2D dimension nodes
 - The canvas edge colors (HSL by the s coordinate) encode data and are independent of the page theme
 - `prefers-reduced-motion: reduce` disables animations
-- Responsive breakpoint at 768px
+- Responsive: single column below 1080px; compact dimension nodes and two-column stats below 640px
 
 ### Game Demo (`gemini3-demo.html` and `gemini3-demo/index.html`)
 A standalone Super Mario-style platformer written in vanilla JavaScript:
@@ -68,8 +69,8 @@ A standalone Super Mario-style platformer written in vanilla JavaScript:
 - Touch controls for mobile devices
 - Web Audio API for sound effects and background music
 - Game features: enemies (Goombas), collectible coins, platforms, pipes, and flag goal
-- Page chrome uses the same orange-accent style as the 8D page (not yet the paper style of `index.html`): color tokens, fonts, noise overlay, drifting background blobs, fixed nav with a link back to the portfolio (root-relative `/` links, so they work from both `/gemini3-demo.html` and `/gemini3-demo/`), animated gradient frame around the game, frosted light start/game-over overlay, pill-shaped character buttons, keyboard hints on desktop, light touch buttons on mobile
-- The canvas is scaled with CSS to fit the viewport height (`--chrome-h` is the vertical space reserved for everything except the canvas); its internal resolution stays 800x450
+- Page chrome uses the same paper style as `index.html`: color tokens, Newsreader / IBM Plex Mono (Noto Sans TC for Chinese), a fixed running head with "JO" and a link back to the portfolio (root-relative `/` links, so they work from both `/gemini3-demo.html` and `/gemini3-demo/`), a 1px ink frame around the game, a translucent paper start/game-over overlay, outlined character buttons (the selected one in the accent color), keyboard hints on desktop, outlined touch buttons on mobile
+- The header, game frame and hints share one width (`.stage`, `--game-w`). The canvas is scaled with CSS to fit the viewport height (`--chrome-h` is the vertical space reserved for everything except the canvas); its internal resolution stays 800x450
 - The game script looks up `#start-screen h1` and `#start-screen p` to change the overlay text, so keep a single `h1` and make the start prompt the first `p` inside `#start-screen`
 
 `gemini3-demo/index.html` is an identical copy that exposes the `/gemini3-demo` route. **When editing the game, apply the same change to both files** (or keep them in sync with `cp gemini3-demo.html gemini3-demo/index.html`).
